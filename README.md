@@ -14,3 +14,87 @@ Mechanics:
 - Your hero starts with several genes always and a few random random ones
 - In each battle, you and the foe take turns reading off N genes and doing their action until one of you wins
 - After each battle, you can add new genes, remove old genes, or reorder genes in some way
+
+## Game Phases
+
+State Machine that controls Game Phases:
+- Loading
+    - -> Menu
+- Menu
+    - -> InBattle
+- Paused
+    - -> InBattle
+- Drafting
+    - -> InBattle
+- InBattle
+    - -> Paused
+    - -> GameOver
+    - -> Victory
+    - -> Drafting
+- GameOver
+- Victory
+
+
+## ECS
+
+### Entity Types
+- Player (Singleton)
+    - InputHandling
+    - Control
+    - Health
+    - Genome
+    - Genome Pointer
+    - Energy
+    - Status
+- Enemy
+    - AI
+    - Control
+    - Health
+    - Genome
+    - Genome Pointer
+    - Energy
+    - Status
+- Gene
+    - Symbol
+    - GeneSpec
+        - Name
+        - GeneType
+        - Text
+        - Target
+        - HealthDelta
+        - StatusDeltas
+        - GenePointerModifier
+            - Reverse(bool)
+            - Translate(u8)
+
+
+### Systems
+- Loading
+    - gene_pool_initialiation_system
+- InBattle
+    - input_handling_system
+    - ai_system
+    - control_system
+    - gene_expression_system
+- InBattle -> Drafting
+    - drafting_options_generation_system
+- Drafting
+    - drafting_system
+- Drafting -> InBattle
+    - enemy_selection_system
+
+
+### Components
+- InputHandlingComponent
+- AIComponent
+- ControlComponent
+- HealthComponent(u8)
+- EnergyComponent(u8)
+- StatusComponent(StructOfStatuses)
+
+### Resources
+- Time
+- Input
+- GamePhase
+- Gene Pool
+- Enemy Pool

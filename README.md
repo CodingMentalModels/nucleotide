@@ -98,3 +98,18 @@ State Machine that controls Game Phases:
 - GamePhase
 - Gene Pool
 - Enemy Pool
+
+
+## Implementation Plan
+
+### V0
+[ ] Bevy functional
+[ ] IyesLoopless functional
+[ ] Fonts loaded and displaying on screen
+[ ] Models loaded and displaying on screen
+
+
+### V1
+[ ] Basic versions of systems implemented for Battle and Components
+
+### V2

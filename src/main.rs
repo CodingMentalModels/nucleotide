@@ -1,3 +1,17 @@
+mod game;
+
+use bevy::prelude::*;
+use iyes_loopless::prelude::*;
+
+use crate::game::battle::NucleotidePlugin;
+use crate::game::ui::UIPlugin;
+use crate::game::resources::*;
+
 fn main() {
-    println!("Hello, world!");
+    App::new()    
+        .add_plugins(DefaultPlugins)
+        .add_loopless_state(NucleotideState::Loading)
+        .add_plugin(UIPlugin)
+        .add_plugin(NucleotidePlugin)
+        .run();
 }

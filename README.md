@@ -103,13 +103,14 @@ State Machine that controls Game Phases:
 ## Implementation Plan
 
 ### V0
-[ ] Bevy functional
-[ ] IyesLoopless functional
+[x] Bevy functional
+[x] IyesLoopless functional
 [ ] Fonts loaded and displaying on screen
-[ ] Models loaded and displaying on screen
-
+[ ] Data driven approach for specifying genes and enemies sketched out
 
 ### V1
 [ ] Basic versions of systems implemented for Battle and Components
+[ ] Models loaded and displaying on screen
+[ ] 10 basic genes and 3 basic enemies
 
 ### V2

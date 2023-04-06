@@ -105,7 +105,7 @@ State Machine that controls Game Phases:
 ### V0
 [x] Bevy functional
 [x] IyesLoopless functional
-[ ] Fonts loaded and displaying on screen
+[x] Fonts loaded and displaying on screen
 [ ] Data driven approach for specifying genes and enemies sketched out
 
 ### V1

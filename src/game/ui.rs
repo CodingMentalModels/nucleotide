@@ -3,15 +3,14 @@ use bevy_egui::{egui, EguiContext, EguiPlugin};
 use iyes_loopless::prelude::*;
 
 use crate::game::resources::*;
+use crate::game::constants::*;
 
 pub struct UIPlugin;
 
 impl Plugin for UIPlugin {
     fn build(&self, app: &mut App) {
         app.add_plugin(EguiPlugin)
-            // .add_system(ui_example_system);
             .add_enter_system(NucleotideState::Loading, configure_visuals)
-            // .add_system(ui_example_system.run_in_state(NucleotideState::Loading));
             .add_system(ui_load_system.run_in_state(NucleotideState::Loading))
             .add_system(battle_ui_system.run_in_state(NucleotideState::InBattle));
             // .add_system(paused_ui_system.run_in_state(PongState::Paused))
@@ -20,12 +19,6 @@ impl Plugin for UIPlugin {
 }
 
 // Systems
-fn ui_example_system(mut ctx: ResMut<EguiContext>) {
-    egui::Window::new("Hello").show(ctx.ctx_mut(), |ui| {
-        ui.label("world");
-    });
-}
-
 fn configure_visuals(mut ctx: ResMut<EguiContext>) {
     ctx.ctx_mut().set_visuals(
         egui::Visuals {
@@ -54,15 +47,17 @@ fn ui_load_system(
                     justify_content: JustifyContent::SpaceBetween,
                     align_items: AlignItems::FlexEnd,
                     ..Default::default()
-                },
-                color: Color::NONE.into(),
+                }, color: Color::NONE.into(),
                 ..Default::default()
             }
         ).with_children(
             |parent| {
+                let mut text = ALPHA_LOWER.to_string();
+                text.push(BETA_UPPER);
+                text.push(GAMMA_UPPER);
                 parent.spawn_bundle(
                     get_text_bundle(
-                        "Nucleotide",
+                        &text,
                         get_text_style(font.clone(), Color::WHITE),
                         JustifyContent::Center,
                     )

@@ -21,7 +21,7 @@ impl Plugin for AssetsPlugin {
 
 // Systems
 
-fn load_assets_system(mut commands: Commands, mut enemy_specs: ResMut<EnemySpecs>, mut gene_specs: ResMut<GeneSpecs>) {
+fn load_assets_system(mut commands: Commands) {
 
     let enemies = read_files_from_directory(Path::new(ENEMY_SPEC_DIRECTORY)).into_iter()
         .map(|s| toml::from_str(&s))
@@ -31,8 +31,11 @@ fn load_assets_system(mut commands: Commands, mut enemy_specs: ResMut<EnemySpecs
         .map(|s| toml::from_str(&s))
         .collect::<Result<Vec<GeneSpec>, Error>>().expect("Error parsing gene specs");
 
-    enemy_specs.0 = enemies.into_iter().map(|s| (s.get_name().clone(), s)).collect();
-    gene_specs.0 = genes.into_iter().map(|s| (s.get_name().clone(), s)).collect();
+    let enemy_specs = enemies.into_iter().map(|s| (s.get_name().clone(), s)).collect();
+    let gene_specs = genes.into_iter().map(|s| (s.get_name().clone(), s)).collect();
+
+    commands.insert_resource(EnemySpecs(enemy_specs));
+    commands.insert_resource(GeneSpecs(gene_specs));
 
 }
 

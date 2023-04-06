@@ -61,16 +61,21 @@ State Machine that controls Game Phases:
         - GeneType
         - Text
         - Target
-        - HealthDelta
-        - StatusDeltas
-        - GenePointerModifier
-            - Reverse(bool)
-            - Translate(u8)
+        - GeneCommand
+
+GeneCommands
+    - Damage(u8)
+    - Heal(u8)
+    - Status(StatusEffect, u8)
+    - JumpForwardNGenes(u8)
+    - ReverseGeneProcessing
+    - GainEnergy(u8)
 
 
 ### Systems
 - Loading
     - gene_pool_initialiation_system
+    - spec_loading_system
 - InBattle
     - input_handling_system
     - ai_system

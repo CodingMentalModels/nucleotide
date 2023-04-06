@@ -10,7 +10,7 @@ use crate::game::resources::*;
 fn main() {
     App::new()    
         .add_plugins(DefaultPlugins)
-        .add_loopless_state(NucleotideState::Loading)
+        .add_loopless_state(NucleotideState::LoadingUI)
         .add_plugin(UIPlugin)
         .add_plugin(NucleotidePlugin)
         .run();

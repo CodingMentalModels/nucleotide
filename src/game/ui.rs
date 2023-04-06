@@ -10,9 +10,9 @@ pub struct UIPlugin;
 impl Plugin for UIPlugin {
     fn build(&self, app: &mut App) {
         app.add_plugin(EguiPlugin)
-            .add_enter_system(NucleotideState::Loading, configure_visuals)
-            .add_system(ui_load_system.run_in_state(NucleotideState::Loading))
-            .add_system(battle_ui_system.run_in_state(NucleotideState::InBattle));
+            .add_enter_system(NucleotideState::LoadingUI, configure_visuals)
+            .add_system(ui_load_system.run_in_state(NucleotideState::LoadingUI))
+            .add_system(battle_ui_system.run_in_state(NucleotideState::InitializingBattle));
             // .add_system(paused_ui_system.run_in_state(PongState::Paused))
             // .add_system(paused_input_system.run_in_state(PongState::Paused));
     }
@@ -65,7 +65,7 @@ fn ui_load_system(
             }
         );
 
-        commands.insert_resource(NextState(NucleotideState::InBattle));
+        commands.insert_resource(NextState(NucleotideState::InitializingBattle));
     }
 
     if asset_server.get_load_state(font) == LoadState::Failed {

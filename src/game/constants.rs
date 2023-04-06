@@ -1,4 +1,7 @@
-
+// Filepaths
+pub const FONT_DIRECTORY: &str = "assets/fonts/";
+pub const ENEMY_SPEC_DIRECTORY: &str = "assets/specs/enemies/";
+pub const GENE_SPEC_DIRECTORY: &str = "assets/specs/genes/";
 
 // Greek Letters
 pub const ALPHA_LOWER: char = 'α';

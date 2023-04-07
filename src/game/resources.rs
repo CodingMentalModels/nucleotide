@@ -1,10 +1,10 @@
-use std::collections::HashMap;
+use std::collections::{BTreeMap};
 
 use bevy::{prelude::*};
 
 use crate::game::specs::GeneCommand;
 
-use super::specs::EnemySpec;
+use super::specs::{EnemySpec, GeneSpec};
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub enum NucleotideState {
@@ -27,8 +27,8 @@ pub struct GeneCommandQueue {
 }
 
 
-#[derive(Debug, Default, Clone, PartialEq, Eq, Hash)]
-pub struct EnemySpecs(pub HashMap<String, EnemySpec>);
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+pub struct EnemySpecs(pub BTreeMap<String, EnemySpec>);
 
-#[derive(Debug, Default, Clone, PartialEq, Eq, Hash)]
-pub struct GeneSpecs(pub HashMap<String, GeneSpec>);
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+pub struct GeneSpecs(pub BTreeMap<String, GeneSpec>);

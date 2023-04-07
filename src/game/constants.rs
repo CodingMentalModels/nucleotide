@@ -3,6 +3,10 @@ pub const FONT_DIRECTORY: &str = "assets/fonts/";
 pub const ENEMY_SPEC_DIRECTORY: &str = "assets/specs/enemies/";
 pub const GENE_SPEC_DIRECTORY: &str = "assets/specs/genes/";
 
+// Game Parameters
+pub const STARTING_PLAYER_ENERGY: u8 = 3;
+pub const STARTING_PLAYER_HEALTH: u8 = 100;
+
 // Greek Letters
 pub const ALPHA_LOWER: char = 'α';
 pub const ALPHA_UPPER: char = 'Α';

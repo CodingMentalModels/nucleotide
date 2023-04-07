@@ -26,6 +26,14 @@ impl GeneSpec {
         self.name.clone()
     }
 
+    pub fn get_text(&self) -> String {
+        self.text.clone()
+    }
+
+    pub fn get_target(&self) -> TargetType {
+        self.target
+    }
+
     pub fn get_gene_commands(&self) -> Vec<GeneCommand> {
         self.gene_commands.clone()
     }
@@ -67,7 +75,8 @@ impl EnemySpec {
 pub enum TargetType {
     Us,
     RandomEnemy,
-    All,
+    AllEnemies,
+    Everyone,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]

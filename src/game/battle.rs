@@ -2,6 +2,11 @@ use bevy::prelude::*;
 use iyes_loopless::prelude::*;
 
 use crate::game::resources::*;
+use crate::game::constants::*;
+
+use super::specs::{GeneCommand, TargetType};
+
+pub type TargetEntity = Entity;
 
 pub struct NucleotidePlugin;
 
@@ -11,6 +16,8 @@ impl Plugin for NucleotidePlugin {
         .insert_resource(Time::default())
         .insert_resource(Input::<KeyCode>::default())
         .insert_resource(GeneCommandQueue::default())
+        .add_event::<DamageEvent>()
+        .add_event::<BlockEvent>()
         .add_enter_system(NucleotideState::InitializingBattle, instantiate_battle_system)
         .add_enter_system(NucleotideState::CharacterActing, character_acting_system)
         .add_enter_system(NucleotideState::GeneHandling, handle_gene_commands_system)
@@ -32,6 +39,12 @@ impl Plugin for NucleotidePlugin {
 
 // Events
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+struct DamageEvent(TargetEntity, u8);
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+struct BlockEvent(TargetEntity, u8);
+
 // End Events
 
 // Systems
@@ -40,9 +53,11 @@ fn instantiate_battle_system(mut commands: Commands, enemy_specs: Res<EnemySpecs
 
     let player_genome = vec!["Sting".to_string(), "Block".to_string()];
     let player_entity = instantiate_player(&mut commands, player_genome);
-    let _enemy_entity = instantiate_enemy(&mut commands, enemy_specs, gene_specs, "Enemy");
+    let enemy_entity = instantiate_enemy(&mut commands, enemy_specs, gene_specs, "Enemy");
 
     commands.insert_resource(CharacterActing(player_entity));
+    commands.insert_resource(PlayerEntity(player_entity));
+    commands.insert_resource(EnemyEntities(vec![enemy_entity]));
 
     commands.insert_resource(NextState(NucleotideState::GeneHandling));
 }
@@ -50,26 +65,66 @@ fn instantiate_battle_system(mut commands: Commands, enemy_specs: Res<EnemySpecs
 fn character_acting_system(
     mut commands: Commands,
     character_acting: Res<CharacterActing>,
+    player_entity: Res<PlayerEntity>,
+    enemy_entities: Res<EnemyEntities>,
     mut gene_command_queue: ResMut<GeneCommandQueue>,
     gene_specs: Res<GeneSpecs>,
-    query: Query<(Entity, &GenomeComponent, &GenomePointerComponent)>,
+    query: Query<(Entity, &EnergyComponent, &GenomeComponent, &GenomePointerComponent)>,
 ) {
-    let (_entity, genome, genome_pointer) = query.get(character_acting.0).unwrap();
+    let (acting_entity, energy, genome, genome_pointer) = query.get(character_acting.0).unwrap();
 
-    let gene = &genome.0[genome_pointer.0];
+    for i in 0..energy.0 {
+        let gene = &genome.0[genome_pointer.0];
+        let gene_spec = gene_specs.0.get(gene).expect("Gene should exist as a gene spec.");
+        let targets = get_targets(acting_entity, player_entity.0, &enemy_entities.0, gene_spec.get_target());
 
-    gene_command_queue.0.append(&mut gene_specs.0.get(gene).expect("Gene should exist as a gene spec.").get_gene_commands());
+        gene_command_queue.0.append(
+            &mut gene_spec.get_gene_commands().iter()
+                .map(|gene_command| targets.iter().map(|target| (gene_command.clone(), target.clone()))).flatten().collect()
+        );
+    }
 
     commands.insert_resource(NextState(NucleotideState::GeneHandling));
 
 }
 
-fn handle_gene_commands_system(mut gene_command_queue: ResMut<GeneCommandQueue>) {
-    unimplemented!()
+fn handle_gene_commands_system(
+    mut gene_command_queue: ResMut<GeneCommandQueue>,
+    mut damage_event_writer: EventWriter<DamageEvent>,
+    mut block_event_writer: EventWriter<BlockEvent>
+) {
+
+    for (gene_command, target_entity) in gene_command_queue.0.iter() {
+        match gene_command {
+            GeneCommand::Damage(damage) => {
+                damage_event_writer.send(DamageEvent(*target_entity, *damage));
+            },
+            GeneCommand::Block(amount) => {
+                block_event_writer.send(BlockEvent(*target_entity, *amount));
+            },
+            _ => panic!("Unimplemented Gene Command!")
+        }
+    }
+
+    gene_command_queue.0.clear();
 }
 
-fn update_health_system() {
-    unimplemented!()
+fn update_health_system(
+    mut query: Query<(Entity, &mut HealthComponent)>,
+    mut damage_event_reader: EventReader<DamageEvent>,
+    mut block_event_reader: EventReader<BlockEvent>,
+) {
+
+    for (entity, mut health) in query.iter_mut() {
+        let total_damage = damage_event_reader.iter().filter(|damage_event| damage_event.0 == entity).map(|damage_event| damage_event.1).sum::<u8>();
+        let total_block = block_event_reader.iter().filter(|block_event| block_event.0 == entity).map(|block_event| block_event.1).sum::<u8>();
+
+        let final_damage = total_damage.saturating_sub(total_block);
+        let final_health = health.0.saturating_sub(final_damage);
+
+        health.0 = final_health;
+
+    }
 }
 
 fn finished_handling_gene_system() {
@@ -98,6 +153,9 @@ pub struct GenomeComponent(pub Vec<String>);
 pub struct GenomePointerComponent(usize);
 
 #[derive(Component, Clone, Copy)]
+pub struct EnergyComponent(pub u8);
+
+#[derive(Component, Clone, Copy)]
 pub struct HealthComponent(pub u8);
 
 
@@ -110,7 +168,8 @@ fn instantiate_player(mut commands: &mut Commands, genome: Vec<String>) -> Entit
         .insert(PlayerComponent)
         .insert(GenomeComponent(genome))
         .insert(GenomePointerComponent(0))
-        .insert(HealthComponent(100))
+        .insert(HealthComponent(STARTING_PLAYER_HEALTH))
+        .insert(EnergyComponent(STARTING_PLAYER_ENERGY))
         .id()
 }
 
@@ -122,7 +181,33 @@ fn instantiate_enemy(mut commands: &mut Commands, enemy_specs: Res<EnemySpecs>, 
         .insert(GenomeComponent(genome))
         .insert(GenomePointerComponent(0))
         .insert(HealthComponent(enemy_spec.get_health()))
+        .insert(EnergyComponent(enemy_spec.get_energy()))
         .id()
+}
+
+fn get_targets(acting_entity: Entity, player_entity: Entity, enemy_entities: &Vec<Entity>, target_type: TargetType) -> Vec<Entity> {
+    match target_type {
+        TargetType::Us => vec![acting_entity],
+        TargetType::RandomEnemy => {
+            if acting_entity == player_entity {
+                vec![enemy_entities[0]] // TODO: Make this actually random
+            } else {
+                vec![player_entity]
+            }
+        },
+        TargetType::AllEnemies => {
+            if acting_entity == player_entity {
+                enemy_entities.clone()
+            } else {
+                vec![player_entity]
+            }
+        }
+        TargetType::Everyone => {
+            let mut everyone = enemy_entities.clone();
+            everyone.push(player_entity);
+            everyone
+        },
+    }
 }
 
 // End Helper Functions

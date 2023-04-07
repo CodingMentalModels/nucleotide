@@ -25,8 +25,14 @@ pub enum NucleotideState {
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub struct CharacterActing(pub Entity);
 
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+pub struct PlayerEntity(pub Entity);
+
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+pub struct EnemyEntities(pub Vec<Entity>);
+
 #[derive(Debug, Default, Clone, PartialEq, Eq, Hash)]
-pub struct GeneCommandQueue(pub Vec<GeneCommand>);
+pub struct GeneCommandQueue(pub Vec<(GeneCommand, Entity)>);
 
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]

@@ -25,6 +25,10 @@ impl GeneSpec {
     pub fn get_name(&self) -> GeneName {
         self.name.clone()
     }
+
+    pub fn get_gene_commands(&self) -> Vec<GeneCommand> {
+        self.gene_commands.clone()
+    }
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash, Serialize, Deserialize)]
@@ -32,22 +36,30 @@ pub struct EnemySpec {
     name: String,
     health: u8,
     energy: u8,
-    gene_pool: Vec<GeneName>,
+    genome: Vec<GeneName>,
 }
 
 impl EnemySpec {
 
-    pub fn new(name: String, health: u8, energy: u8, gene_pool: Vec<GeneName>) -> Self {
+    pub fn new(name: String, health: u8, energy: u8, genome: Vec<GeneName>) -> Self {
         Self {
             name,
             health,
             energy,
-            gene_pool,
+            genome,
         }
     }
 
     pub fn get_name(&self) -> EnemyName {
         self.name.clone()
+    }
+
+    pub fn get_health(&self) -> u8 {
+        self.health
+    }
+
+    pub fn get_genome(&self) -> Vec<GeneName> {
+        self.genome.clone()
     }
 }
 

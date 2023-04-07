@@ -14,6 +14,7 @@ pub enum NucleotideState {
     Paused,
     Drafting,
     InitializingBattle,
+    CharacterActing,
     GeneHandling,
     GeneAnimating,
     GameOver,
@@ -21,10 +22,11 @@ pub enum NucleotideState {
 }
 
 
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+pub struct CharacterActing(pub Entity);
+
 #[derive(Debug, Default, Clone, PartialEq, Eq, Hash)]
-pub struct GeneCommandQueue {
-    pub queue: Vec<GeneCommand>,
-}
+pub struct GeneCommandQueue(pub Vec<GeneCommand>);
 
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]

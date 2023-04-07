@@ -1,0 +1,10 @@
+{
+    "name": "Block",
+    "text": "Block 5 damage.",
+    "target": "Us",
+    "gene_commands": [
+        {
+            "Block": 5
+        }
+    ]
+}

@@ -1,0 +1,10 @@
+{
+    "name": "Sting",
+    "text": "Deal 6 damage.",
+    "target": "RandomEnemy",
+    "gene_commands": [
+        {
+            "Damage": 6
+        }
+    ]
+}

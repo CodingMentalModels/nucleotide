@@ -1,6 +1,7 @@
 mod game;
 
 use bevy::prelude::*;
+use game::assets::AssetsPlugin;
 use iyes_loopless::prelude::*;
 
 use crate::game::battle::NucleotidePlugin;
@@ -10,7 +11,8 @@ use crate::game::resources::*;
 fn main() {
     App::new()    
         .add_plugins(DefaultPlugins)
-        .add_loopless_state(NucleotideState::LoadingUI)
+        .add_loopless_state(NucleotideState::LoadingAssets)
+        .add_plugin(AssetsPlugin)
         .add_plugin(UIPlugin)
         .add_plugin(NucleotidePlugin)
         .run();

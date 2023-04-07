@@ -13,6 +13,15 @@ pub struct GeneSpec {
 
 impl GeneSpec {
 
+    pub fn new(name: GeneName, text: String, target: TargetType, gene_commands: Vec<GeneCommand>) -> Self {
+        Self {
+            name,
+            text,
+            target,
+            gene_commands,
+        }
+    }
+
     pub fn get_name(&self) -> GeneName {
         self.name.clone()
     }
@@ -28,6 +37,15 @@ pub struct EnemySpec {
 
 impl EnemySpec {
 
+    pub fn new(name: String, health: u8, energy: u8, gene_pool: Vec<GeneName>) -> Self {
+        Self {
+            name,
+            health,
+            energy,
+            gene_pool,
+        }
+    }
+
     pub fn get_name(&self) -> EnemyName {
         self.name.clone()
     }
@@ -36,13 +54,14 @@ impl EnemySpec {
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
 pub enum TargetType {
     Us,
-    Enemy(usize),
+    RandomEnemy,
     All,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
 pub enum GeneCommand {
     Damage(u8),
+    Block(u8),
     Heal(u8),
     Status(StatusEffect, u8),
     JumpForwardNGenes(u8),

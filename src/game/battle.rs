@@ -20,9 +20,11 @@ impl Plugin for NucleotidePlugin {
         .add_event::<BlockEvent>()
         .add_enter_system(NucleotideState::InitializingBattle, instantiate_battle_system)
         .add_enter_system(NucleotideState::CharacterActing, character_acting_system)
+        .add_enter_system(NucleotideState::GeneLoading, gene_loading_system)
         .add_enter_system(NucleotideState::GeneHandling, handle_gene_commands_system)
         .add_system(update_health_system.run_in_state(NucleotideState::GeneHandling))
-        .add_system(finished_handling_gene_system.run_in_state(NucleotideState::GeneHandling))
+        .add_system(finished_handling_gene_system.run_in_state(NucleotideState::GeneHandling)
+            .after("update_health_system"))
         .add_enter_system(NucleotideState::GeneAnimating, animate_gene_system);
     }
 }
@@ -59,30 +61,61 @@ fn instantiate_battle_system(mut commands: Commands, enemy_specs: Res<EnemySpecs
     commands.insert_resource(PlayerEntity(player_entity));
     commands.insert_resource(EnemyEntities(vec![enemy_entity]));
 
-    commands.insert_resource(NextState(NucleotideState::GeneHandling));
+    commands.insert_resource(NextState(NucleotideState::CharacterActing));
 }
 
 fn character_acting_system(
     mut commands: Commands,
-    character_acting: Res<CharacterActing>,
+    mut character_acting: ResMut<CharacterActing>,
+    player_entity: Res<PlayerEntity>,
+    enemy_entities: Res<EnemyEntities>,
+    mut query: Query<(Entity, &mut EnergyComponent)>,
+) {
+
+    let (
+        acting_entity,
+        mut energy,
+    ) = query.get_mut(character_acting.0).unwrap();
+
+    if energy.energy_remaining == 0 {
+        energy.energy_remaining = energy.starting_energy;
+        character_acting.0 = if acting_entity == player_entity.0 {
+            enemy_entities.0[0]
+        } else {
+            player_entity.0
+        };
+    } else {
+        energy.energy_remaining -= 1;
+    }
+
+    commands.insert_resource(NextState(NucleotideState::GeneLoading));
+
+}
+
+fn gene_loading_system(
+    mut commands: Commands,
+    character_acting: ResMut<CharacterActing>,
     player_entity: Res<PlayerEntity>,
     enemy_entities: Res<EnemyEntities>,
     mut gene_command_queue: ResMut<GeneCommandQueue>,
     gene_specs: Res<GeneSpecs>,
-    query: Query<(Entity, &EnergyComponent, &GenomeComponent, &GenomePointerComponent)>,
+    query: Query<(Entity, &GenomeComponent, &GenomePointerComponent)>,
 ) {
-    let (acting_entity, energy, genome, genome_pointer) = query.get(character_acting.0).unwrap();
 
-    for i in 0..energy.0 {
-        let gene = &genome.0[genome_pointer.0];
-        let gene_spec = gene_specs.0.get(gene).expect("Gene should exist as a gene spec.");
-        let targets = get_targets(acting_entity, player_entity.0, &enemy_entities.0, gene_spec.get_target());
+    let (
+        acting_entity,
+        genome,
+        genome_pointer
+    ) = query.get(character_acting.0).unwrap();
 
-        gene_command_queue.0.append(
-            &mut gene_spec.get_gene_commands().iter()
-                .map(|gene_command| targets.iter().map(|target| (gene_command.clone(), target.clone()))).flatten().collect()
-        );
-    }
+    let gene = &genome.0[genome_pointer.0];
+    let gene_spec = gene_specs.0.get(gene).expect("Gene should exist as a gene spec.");
+    let targets = get_targets(acting_entity, player_entity.0, &enemy_entities.0, gene_spec.get_target());
+
+    gene_command_queue.0.append(
+        &mut gene_spec.get_gene_commands().iter()
+            .map(|gene_command| targets.iter().map(|target| (gene_command.clone(), target.clone()))).flatten().collect()
+    );
 
     commands.insert_resource(NextState(NucleotideState::GeneHandling));
 
@@ -127,8 +160,8 @@ fn update_health_system(
     }
 }
 
-fn finished_handling_gene_system() {
-    unimplemented!()
+fn finished_handling_gene_system(mut commands: Commands) {
+    commands.insert_resource(NextState(NucleotideState::GeneAnimating));
 }
 
 fn animate_gene_system() {
@@ -153,7 +186,21 @@ pub struct GenomeComponent(pub Vec<String>);
 pub struct GenomePointerComponent(usize);
 
 #[derive(Component, Clone, Copy)]
-pub struct EnergyComponent(pub u8);
+pub struct EnergyComponent {
+    pub energy_remaining: u8,
+    pub starting_energy: u8,
+}
+
+impl EnergyComponent {
+
+    pub fn new(energy_remaining: u8, starting_energy: u8) -> Self {
+        EnergyComponent {
+            energy_remaining,
+            starting_energy,
+        }
+    }
+
+}
 
 #[derive(Component, Clone, Copy)]
 pub struct HealthComponent(pub u8);
@@ -169,7 +216,7 @@ fn instantiate_player(mut commands: &mut Commands, genome: Vec<String>) -> Entit
         .insert(GenomeComponent(genome))
         .insert(GenomePointerComponent(0))
         .insert(HealthComponent(STARTING_PLAYER_HEALTH))
-        .insert(EnergyComponent(STARTING_PLAYER_ENERGY))
+        .insert(EnergyComponent::new(STARTING_PLAYER_ENERGY, STARTING_PLAYER_ENERGY))
         .id()
 }
 
@@ -181,7 +228,7 @@ fn instantiate_enemy(mut commands: &mut Commands, enemy_specs: Res<EnemySpecs>, 
         .insert(GenomeComponent(genome))
         .insert(GenomePointerComponent(0))
         .insert(HealthComponent(enemy_spec.get_health()))
-        .insert(EnergyComponent(enemy_spec.get_energy()))
+        .insert(EnergyComponent::new(enemy_spec.get_energy(), enemy_spec.get_energy()))
         .id()
 }
 

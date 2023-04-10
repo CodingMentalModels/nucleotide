@@ -15,6 +15,7 @@ pub enum NucleotideState {
     Drafting,
     InitializingBattle,
     CharacterActing,
+    GeneLoading,
     GeneHandling,
     GeneAnimating,
     GameOver,

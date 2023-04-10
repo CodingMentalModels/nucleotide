@@ -66,6 +66,10 @@ impl EnemySpec {
         self.health
     }
 
+    pub fn get_energy(&self) -> u8 {
+        self.energy
+    }
+
     pub fn get_genome(&self) -> Vec<GeneName> {
         self.genome.clone()
     }

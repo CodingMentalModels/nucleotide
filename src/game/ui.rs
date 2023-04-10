@@ -18,6 +18,12 @@ impl Plugin for UIPlugin {
     }
 }
 
+// Components
+#[derive(Component, Clone, Copy)]
+pub struct PlayerHealthDisplayComponent(u8);
+
+// End Components
+
 // Systems
 fn configure_visuals(mut ctx: ResMut<EguiContext>) {
     ctx.ctx_mut().set_visuals(
@@ -61,6 +67,41 @@ fn ui_load_system(
                         get_text_style(font.clone(), Color::WHITE),
                         JustifyContent::Center,
                     )
+                );
+                parent.spawn_bundle(
+                    NodeBundle {
+                        style: Style {
+                            size: Size::new(Val::Percent(50.0), Val::Percent(50.0)),
+                            position_type: PositionType::Absolute,
+                            position: UiRect {
+                                left: Val::Percent(0.0),
+                                top: Val::Percent(50.0),
+                                ..Default::default()
+                            },
+                            flex_direction: FlexDirection::ColumnReverse,
+                            justify_content: JustifyContent::FlexStart,
+                            align_items: AlignItems::FlexStart,
+                            ..Default::default()
+                        }, color: Color::BLACK.into(),
+                        ..Default::default()
+                    }
+                ).with_children(
+                    |parent| {
+                        parent.spawn_bundle(
+                            get_text_bundle(
+                                "Player",
+                                get_text_style(font.clone(), Color::WHITE),
+                                JustifyContent::FlexEnd,
+                            )
+                        );
+                        parent.spawn_bundle(
+                            get_text_bundle(
+                                "Health: 999999",
+                                get_text_style(font.clone(), Color::WHITE),
+                                JustifyContent::FlexStart,
+                            )
+                        ).insert(PlayerHealthDisplayComponent(u8::MAX));
+                    }
                 );
             }
         );

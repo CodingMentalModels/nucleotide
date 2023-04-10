@@ -21,10 +21,9 @@ impl Plugin for NucleotidePlugin {
         .add_enter_system(NucleotideState::InitializingBattle, instantiate_battle_system)
         .add_enter_system(NucleotideState::CharacterActing, character_acting_system)
         .add_enter_system(NucleotideState::GeneLoading, gene_loading_system)
-        .add_enter_system(NucleotideState::GeneHandling, handle_gene_commands_system)
-        .add_system(update_health_system.run_in_state(NucleotideState::GeneHandling))
-        .add_system(finished_handling_gene_system.run_in_state(NucleotideState::GeneHandling)
-            .after("update_health_system"))
+        .add_enter_system(NucleotideState::GeneCommandHandling, handle_gene_commands_system)
+        .add_enter_system(NucleotideState::GeneEventHandling, update_health_system)
+        .add_system(finished_handling_gene_system.run_in_state(NucleotideState::GeneEventHandling))
         .add_enter_system(NucleotideState::GeneAnimating, animate_gene_system);
     }
 }
@@ -117,7 +116,7 @@ fn gene_loading_system(
             .map(|gene_command| targets.iter().map(|target| (gene_command.clone(), target.clone()))).flatten().collect()
     );
 
-    commands.insert_resource(NextState(NucleotideState::GeneHandling));
+    commands.insert_resource(NextState(NucleotideState::GeneCommandHandling));
 
 }
 
@@ -164,8 +163,8 @@ fn finished_handling_gene_system(mut commands: Commands) {
     commands.insert_resource(NextState(NucleotideState::GeneAnimating));
 }
 
-fn animate_gene_system() {
-    unimplemented!()
+fn animate_gene_system(mut commands: Commands) {
+    commands.insert_resource(NextState(NucleotideState::CharacterActing));
 }
 
 // End Systems

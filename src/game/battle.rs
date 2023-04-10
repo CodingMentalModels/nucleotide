@@ -5,6 +5,7 @@ use crate::game::resources::*;
 use crate::game::constants::*;
 
 use super::specs::{GeneCommand, TargetType};
+use super::ui::{DisplayComponent, PlayerHealthDisplayComponent, PlayerBlockDisplayComponent};
 
 pub type TargetEntity = Entity;
 
@@ -24,7 +25,8 @@ impl Plugin for NucleotidePlugin {
         .add_enter_system(NucleotideState::GeneCommandHandling, handle_gene_commands_system)
         .add_enter_system(NucleotideState::GeneEventHandling, update_health_system)
         .add_system(finished_handling_gene_system.run_in_state(NucleotideState::GeneEventHandling))
-        .add_enter_system(NucleotideState::GeneAnimating, animate_gene_system);
+        .add_enter_system(NucleotideState::GeneAnimating, render_health_system)
+        .add_system(finished_animating_gene_system.run_in_state(NucleotideState::GeneAnimating));
     }
 }
 
@@ -121,6 +123,7 @@ fn gene_loading_system(
 }
 
 fn handle_gene_commands_system(
+    mut commands: Commands,
     mut gene_command_queue: ResMut<GeneCommandQueue>,
     mut damage_event_writer: EventWriter<DamageEvent>,
     mut block_event_writer: EventWriter<BlockEvent>
@@ -139,6 +142,8 @@ fn handle_gene_commands_system(
     }
 
     gene_command_queue.0.clear();
+
+    commands.insert_resource(NextState(NucleotideState::GeneEventHandling));
 }
 
 fn update_health_system(
@@ -146,6 +151,7 @@ fn update_health_system(
     mut damage_event_reader: EventReader<DamageEvent>,
     mut block_event_reader: EventReader<BlockEvent>,
 ) {
+
 
     for (entity, mut health) in query.iter_mut() {
         let total_damage = damage_event_reader.iter().filter(|damage_event| damage_event.0 == entity).map(|damage_event| damage_event.1).sum::<u8>();
@@ -163,7 +169,20 @@ fn finished_handling_gene_system(mut commands: Commands) {
     commands.insert_resource(NextState(NucleotideState::GeneAnimating));
 }
 
-fn animate_gene_system(mut commands: Commands) {
+fn render_health_system(
+    player_health_query: Query<(&HealthComponent), With<PlayerComponent>>,
+    mut display_query: Query<(&mut DisplayComponent), With<PlayerHealthDisplayComponent>>,
+) {
+
+    let player_health = player_health_query.iter().next().unwrap();
+
+    let mut display = display_query.iter_mut().next().unwrap();
+
+    display.value = player_health.0;
+
+}
+
+fn finished_animating_gene_system(mut commands: Commands) {
     commands.insert_resource(NextState(NucleotideState::CharacterActing));
 }
 

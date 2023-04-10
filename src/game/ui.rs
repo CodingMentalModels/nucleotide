@@ -12,15 +12,36 @@ impl Plugin for UIPlugin {
         app.add_plugin(EguiPlugin)
             .add_enter_system(NucleotideState::LoadingUI, configure_visuals)
             .add_system(ui_load_system.run_in_state(NucleotideState::LoadingUI))
-            .add_system(battle_ui_system.run_in_state(NucleotideState::InitializingBattle));
+            .add_system(render_system.run_in_state(NucleotideState::GeneAnimating));
+            // .add_system(battle_ui_system.run_in_state(NucleotideState::GeneAnimating));
             // .add_system(paused_ui_system.run_in_state(PongState::Paused))
             // .add_system(paused_input_system.run_in_state(PongState::Paused));
     }
 }
 
 // Components
+#[derive(Component, Clone)]
+pub struct DisplayComponent {
+    pub prefix: String,
+    pub value: u8,
+}
+
+impl DisplayComponent {
+
+    pub fn new(prefix: String, value: u8) -> Self {
+        Self {
+            prefix,
+            value,
+        }
+    }
+}
+
+
 #[derive(Component, Clone, Copy)]
-pub struct PlayerHealthDisplayComponent(u8);
+pub struct PlayerHealthDisplayComponent;
+
+#[derive(Component, Clone, Copy)]
+pub struct PlayerBlockDisplayComponent;
 
 // End Components
 
@@ -100,7 +121,16 @@ fn ui_load_system(
                                 get_text_style(font.clone(), Color::WHITE),
                                 JustifyContent::FlexStart,
                             )
-                        ).insert(PlayerHealthDisplayComponent(u8::MAX));
+                        ).insert(DisplayComponent::new("Health".to_string(), u8::MAX))
+                        .insert(PlayerHealthDisplayComponent);
+                        parent.spawn_bundle(
+                            get_text_bundle(
+                                "Block: 0",
+                                get_text_style(font.clone(), Color::WHITE),
+                                JustifyContent::FlexStart,
+                            )
+                        ).insert(DisplayComponent::new("Block".to_string(), u8::MAX))
+                        .insert(PlayerBlockDisplayComponent);
                     }
                 );
             }
@@ -115,10 +145,18 @@ fn ui_load_system(
 
 }
 
-fn battle_ui_system(mut egui_ctx: ResMut<EguiContext>, query: Query<&Text>) {
-    egui::TopBottomPanel::top("top_panel").show(egui_ctx.ctx_mut(), |ui| {
-        ui.label("Nucleotide");
-    });
+// fn battle_ui_system(mut egui_ctx: ResMut<EguiContext>, query: Query<&Text>) {
+//     egui::TopBottomPanel::top("top_panel").show(egui_ctx.ctx_mut(), |ui| {
+//         ui.label("Nucleotide");
+//     });
+// }
+
+fn render_system(mut query: Query<(&DisplayComponent, &mut Text), With<PlayerHealthDisplayComponent>>) {
+
+    for (display, mut text) in &mut query {
+        text.sections[0].value = format!("{}: {}", display.prefix.to_string(), display.value.to_string());
+    }
+
 }
 
 // Helper Functions

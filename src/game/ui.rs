@@ -38,10 +38,7 @@ impl DisplayComponent {
 
 
 #[derive(Component, Clone)]
-pub struct HealthDisplayComponent(pub CharacterType);
-
-#[derive(Component, Clone)]
-pub struct BlockDisplayComponent(pub CharacterType);
+pub struct CharacterDisplayComponent(pub CharacterType, pub CharacterDisplayType);
 
 // End Components
 
@@ -116,9 +113,17 @@ fn ui_load_system(
                         get_text_bundle(
                             "Player",
                             get_text_style(font.clone(), Color::WHITE),
-                            JustifyContent::FlexEnd,
+                            JustifyContent::FlexStart,
                         )
                     );
+                    parent.spawn_bundle(
+                        get_text_bundle(
+                            "Energy: 0",
+                            get_text_style(font.clone(), Color::WHITE),
+                            JustifyContent::FlexStart,
+                        )
+                    ).insert(DisplayComponent::new("Energy".to_string(), u8::MAX))
+                    .insert(CharacterDisplayComponent(CharacterType::Player, CharacterDisplayType::Energy));
                     parent.spawn_bundle(
                         get_text_bundle(
                             "Health: 999999",
@@ -126,7 +131,7 @@ fn ui_load_system(
                             JustifyContent::FlexStart,
                         )
                     ).insert(DisplayComponent::new("Health".to_string(), u8::MAX))
-                    .insert(HealthDisplayComponent(CharacterType::Player));
+                    .insert(CharacterDisplayComponent(CharacterType::Player, CharacterDisplayType::Health));
                     parent.spawn_bundle(
                         get_text_bundle(
                             "Block: 0",
@@ -134,7 +139,7 @@ fn ui_load_system(
                             JustifyContent::FlexStart,
                         )
                     ).insert(DisplayComponent::new("Block".to_string(), u8::MAX))
-                    .insert(BlockDisplayComponent(CharacterType::Player));
+                    .insert(CharacterDisplayComponent(CharacterType::Player, CharacterDisplayType::Block));
                 }
             );
 
@@ -150,7 +155,7 @@ fn ui_load_system(
                             ..Default::default()
                         },
                         flex_direction: FlexDirection::ColumnReverse,
-                        justify_content: JustifyContent::FlexStart,
+                        justify_content: JustifyContent::FlexEnd,
                         align_items: AlignItems::FlexEnd,
                         ..Default::default()
                     }, color: Color::BLACK.into(),
@@ -162,9 +167,17 @@ fn ui_load_system(
                         get_text_bundle(
                             "Enemy",
                             get_text_style(font.clone(), Color::WHITE),
-                            JustifyContent::FlexEnd,
+                            JustifyContent::FlexStart,
                         )
                     );
+                    parent.spawn_bundle(
+                        get_text_bundle(
+                            "Energy: 0",
+                            get_text_style(font.clone(), Color::WHITE),
+                            JustifyContent::FlexStart,
+                        )
+                    ).insert(DisplayComponent::new("Energy".to_string(), u8::MAX))
+                    .insert(CharacterDisplayComponent(CharacterType::Enemy, CharacterDisplayType::Energy));
                     parent.spawn_bundle(
                         get_text_bundle(
                             "Health: 999999",
@@ -172,7 +185,7 @@ fn ui_load_system(
                             JustifyContent::FlexStart,
                         )
                     ).insert(DisplayComponent::new("Health".to_string(), u8::MAX))
-                    .insert(HealthDisplayComponent(CharacterType::Enemy));
+                    .insert(CharacterDisplayComponent(CharacterType::Enemy, CharacterDisplayType::Health));
                     parent.spawn_bundle(
                         get_text_bundle(
                             "Block: 0",
@@ -180,7 +193,7 @@ fn ui_load_system(
                             JustifyContent::FlexStart,
                         )
                     ).insert(DisplayComponent::new("Block".to_string(), u8::MAX))
-                    .insert(BlockDisplayComponent(CharacterType::Enemy));
+                    .insert(CharacterDisplayComponent(CharacterType::Enemy, CharacterDisplayType::Block));
                 }
             );
         }
@@ -228,7 +241,7 @@ fn get_text_bundle(
 fn get_text_style(font: Handle<Font>, color: Color) -> TextStyle {
     TextStyle {
         font: font,
-        font_size: 50.0,
+        font_size: 30.0,
         color: color,
     }
 }

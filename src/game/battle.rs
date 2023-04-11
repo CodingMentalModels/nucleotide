@@ -7,7 +7,7 @@ use crate::game::resources::*;
 use crate::game::constants::*;
 
 use super::specs::{GeneCommand, TargetType};
-use super::ui::{DisplayComponent, HealthDisplayComponent, BlockDisplayComponent};
+use super::ui::{DisplayComponent, CharacterDisplayComponent};
 
 pub type TargetEntity = Entity;
 
@@ -27,7 +27,7 @@ impl Plugin for NucleotidePlugin {
         .add_enter_system(NucleotideState::GeneCommandHandling, handle_gene_commands_system)
         .add_enter_system(NucleotideState::GeneEventHandling, update_health_system)
         .add_system(finished_handling_gene_system.run_in_state(NucleotideState::GeneEventHandling))
-        .add_enter_system(NucleotideState::GeneAnimating, render_health_system)
+        .add_enter_system(NucleotideState::GeneAnimating, render_character_display_system)
         .add_system(finished_animating_gene_system.run_in_state(NucleotideState::GeneAnimating));
     }
 }
@@ -164,16 +164,20 @@ fn finished_handling_gene_system(mut commands: Commands) {
     commands.insert_resource(NextState(NucleotideState::GeneAnimating));
 }
 
-fn render_health_system(
-    health_query: Query<(Entity, &HealthComponent)>,
-    mut display_query: Query<(&HealthDisplayComponent, &mut DisplayComponent)>,
+fn render_character_display_system(
+    character_display_query: Query<(Entity, &HealthComponent, &BlockComponent, &EnergyComponent)>,
+    mut display_query: Query<(&CharacterDisplayComponent, &mut DisplayComponent)>,
     character_type_to_entity_map: Res<CharacterTypeToEntity>,
 ) {
 
-    for (entity, health) in health_query.iter() {
+    for (entity, health, block, energy) in character_display_query.iter() {
         for (display_component, mut display) in display_query.iter_mut() {
             if entity == character_type_to_entity_map.get(display_component.0) {
-                display.value = health.0;
+                match display_component.1 {
+                    CharacterDisplayType::Health => display.value = health.0,
+                    CharacterDisplayType::Block => display.value = block.0,
+                    CharacterDisplayType::Energy => display.value = energy.energy_remaining,
+                }
             }
         }
     }
@@ -220,6 +224,9 @@ impl EnergyComponent {
 #[derive(Component, Clone, Copy)]
 pub struct HealthComponent(pub u8);
 
+#[derive(Component, Clone, Copy)]
+pub struct BlockComponent(pub u8);
+
 
 // End Components
 
@@ -231,6 +238,7 @@ fn instantiate_player(mut commands: &mut Commands, genome: Vec<String>) -> Entit
         .insert(GenomeComponent(genome))
         .insert(GenomePointerComponent(0))
         .insert(HealthComponent(STARTING_PLAYER_HEALTH))
+        .insert(BlockComponent(0))
         .insert(EnergyComponent::new(STARTING_PLAYER_ENERGY, STARTING_PLAYER_ENERGY))
         .id()
 }
@@ -243,6 +251,7 @@ fn instantiate_enemy(mut commands: &mut Commands, enemy_specs: Res<EnemySpecs>, 
         .insert(GenomeComponent(genome))
         .insert(GenomePointerComponent(0))
         .insert(HealthComponent(enemy_spec.get_health()))
+        .insert(BlockComponent(0))
         .insert(EnergyComponent::new(enemy_spec.get_energy(), enemy_spec.get_energy()))
         .id()
 }

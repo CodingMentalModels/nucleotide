@@ -63,3 +63,11 @@ pub enum CharacterType {
     Player,
     Enemy,
 }
+
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+pub enum CharacterDisplayType {
+    Health,
+    Block,
+    Energy,
+}

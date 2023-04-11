@@ -37,11 +37,11 @@ impl DisplayComponent {
 }
 
 
-#[derive(Component, Clone, Copy)]
-pub struct PlayerHealthDisplayComponent;
+#[derive(Component, Clone)]
+pub struct HealthDisplayComponent(pub CharacterType);
 
-#[derive(Component, Clone, Copy)]
-pub struct PlayerBlockDisplayComponent;
+#[derive(Component, Clone)]
+pub struct BlockDisplayComponent(pub CharacterType);
 
 // End Components
 
@@ -91,6 +91,8 @@ fn ui_load_system(
                     JustifyContent::Center,
                 )
             );
+
+            // Player UI
             parent.spawn_bundle(
                 NodeBundle {
                     style: Style {
@@ -124,7 +126,7 @@ fn ui_load_system(
                             JustifyContent::FlexStart,
                         )
                     ).insert(DisplayComponent::new("Health".to_string(), u8::MAX))
-                    .insert(PlayerHealthDisplayComponent);
+                    .insert(HealthDisplayComponent(CharacterType::Player));
                     parent.spawn_bundle(
                         get_text_bundle(
                             "Block: 0",
@@ -132,7 +134,53 @@ fn ui_load_system(
                             JustifyContent::FlexStart,
                         )
                     ).insert(DisplayComponent::new("Block".to_string(), u8::MAX))
-                    .insert(PlayerBlockDisplayComponent);
+                    .insert(BlockDisplayComponent(CharacterType::Player));
+                }
+            );
+
+            // Enemy UI
+            parent.spawn_bundle(
+                NodeBundle {
+                    style: Style {
+                        size: Size::new(Val::Percent(30.0), Val::Percent(30.0)),
+                        position_type: PositionType::Absolute,
+                        position: UiRect {
+                            right: Val::Percent(30.0),
+                            top: Val::Percent(0.0),
+                            ..Default::default()
+                        },
+                        flex_direction: FlexDirection::ColumnReverse,
+                        justify_content: JustifyContent::FlexStart,
+                        align_items: AlignItems::FlexEnd,
+                        ..Default::default()
+                    }, color: Color::BLACK.into(),
+                    ..Default::default()
+                }
+            ).with_children(
+                |parent| {
+                    parent.spawn_bundle(
+                        get_text_bundle(
+                            "Enemy",
+                            get_text_style(font.clone(), Color::WHITE),
+                            JustifyContent::FlexEnd,
+                        )
+                    );
+                    parent.spawn_bundle(
+                        get_text_bundle(
+                            "Health: 999999",
+                            get_text_style(font.clone(), Color::WHITE),
+                            JustifyContent::FlexStart,
+                        )
+                    ).insert(DisplayComponent::new("Health".to_string(), u8::MAX))
+                    .insert(HealthDisplayComponent(CharacterType::Enemy));
+                    parent.spawn_bundle(
+                        get_text_bundle(
+                            "Block: 0",
+                            get_text_style(font.clone(), Color::WHITE),
+                            JustifyContent::FlexStart,
+                        )
+                    ).insert(DisplayComponent::new("Block".to_string(), u8::MAX))
+                    .insert(BlockDisplayComponent(CharacterType::Enemy));
                 }
             );
         }
@@ -148,7 +196,7 @@ fn ui_load_system(
 //     });
 // }
 
-fn render_system(mut query: Query<(&DisplayComponent, &mut Text), With<PlayerHealthDisplayComponent>>) {
+fn render_system(mut query: Query<(&DisplayComponent, &mut Text)>) {
 
     for (display, mut text) in &mut query {
         text.sections[0].value = format!("{}: {}", display.prefix.to_string(), display.value.to_string());

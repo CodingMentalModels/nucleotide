@@ -11,7 +11,7 @@ impl Plugin for UIPlugin {
     fn build(&self, app: &mut App) {
         app.add_plugin(EguiPlugin)
             .add_enter_system(NucleotideState::LoadingUI, configure_visuals)
-            .add_system(ui_load_system.run_in_state(NucleotideState::LoadingUI))
+            .add_enter_system(NucleotideState::LoadingUI, ui_load_system)
             .add_system(render_system.run_in_state(NucleotideState::GeneAnimating));
             // .add_system(battle_ui_system.run_in_state(NucleotideState::GeneAnimating));
             // .add_system(paused_ui_system.run_in_state(PongState::Paused))
@@ -62,86 +62,83 @@ fn ui_load_system(
 
     let font = asset_server.load("fonts/Roboto-Regular.ttf");
 
-    if asset_server.get_load_state(font.clone()) == LoadState::Loaded {
+    if asset_server.get_load_state(font.clone()) == LoadState::Failed {
+        panic!("Failed to load font: {:?}", asset_server.get_load_state(font.clone()));
+    }
 
-        commands.spawn_bundle(Camera2dBundle::default());
+    commands.spawn_bundle(Camera2dBundle::default());
 
-        commands.spawn_bundle(
-            NodeBundle {
-                style: Style {
-                    size: Size::new(Val::Percent(100.0), Val::Percent(100.0)),
-                    position_type: PositionType::Absolute,
-                    justify_content: JustifyContent::SpaceBetween,
-                    align_items: AlignItems::FlexEnd,
-                    ..Default::default()
-                }, color: Color::NONE.into(),
+    commands.spawn_bundle(
+        NodeBundle {
+            style: Style {
+                size: Size::new(Val::Percent(100.0), Val::Percent(100.0)),
+                position_type: PositionType::Absolute,
+                justify_content: JustifyContent::SpaceBetween,
+                align_items: AlignItems::FlexEnd,
                 ..Default::default()
-            }
-        ).with_children(
-            |parent| {
-                let mut text = ALPHA_LOWER.to_string();
-                text.push(BETA_UPPER);
-                text.push(GAMMA_UPPER);
-                parent.spawn_bundle(
-                    get_text_bundle(
-                        &text,
-                        get_text_style(font.clone(), Color::WHITE),
-                        JustifyContent::Center,
-                    )
-                );
-                parent.spawn_bundle(
-                    NodeBundle {
-                        style: Style {
-                            size: Size::new(Val::Percent(50.0), Val::Percent(50.0)),
-                            position_type: PositionType::Absolute,
-                            position: UiRect {
-                                left: Val::Percent(0.0),
-                                top: Val::Percent(50.0),
-                                ..Default::default()
-                            },
-                            flex_direction: FlexDirection::ColumnReverse,
-                            justify_content: JustifyContent::FlexStart,
-                            align_items: AlignItems::FlexStart,
+            }, color: Color::NONE.into(),
+            ..Default::default()
+        }
+    ).with_children(
+        |parent| {
+            let mut text = ALPHA_LOWER.to_string();
+            text.push(BETA_UPPER);
+            text.push(GAMMA_UPPER);
+            parent.spawn_bundle(
+                get_text_bundle(
+                    &text,
+                    get_text_style(font.clone(), Color::WHITE),
+                    JustifyContent::Center,
+                )
+            );
+            parent.spawn_bundle(
+                NodeBundle {
+                    style: Style {
+                        size: Size::new(Val::Percent(50.0), Val::Percent(50.0)),
+                        position_type: PositionType::Absolute,
+                        position: UiRect {
+                            left: Val::Percent(0.0),
+                            top: Val::Percent(50.0),
                             ..Default::default()
-                        }, color: Color::BLACK.into(),
+                        },
+                        flex_direction: FlexDirection::ColumnReverse,
+                        justify_content: JustifyContent::FlexStart,
+                        align_items: AlignItems::FlexStart,
                         ..Default::default()
-                    }
-                ).with_children(
-                    |parent| {
-                        parent.spawn_bundle(
-                            get_text_bundle(
-                                "Player",
-                                get_text_style(font.clone(), Color::WHITE),
-                                JustifyContent::FlexEnd,
-                            )
-                        );
-                        parent.spawn_bundle(
-                            get_text_bundle(
-                                "Health: 999999",
-                                get_text_style(font.clone(), Color::WHITE),
-                                JustifyContent::FlexStart,
-                            )
-                        ).insert(DisplayComponent::new("Health".to_string(), u8::MAX))
-                        .insert(PlayerHealthDisplayComponent);
-                        parent.spawn_bundle(
-                            get_text_bundle(
-                                "Block: 0",
-                                get_text_style(font.clone(), Color::WHITE),
-                                JustifyContent::FlexStart,
-                            )
-                        ).insert(DisplayComponent::new("Block".to_string(), u8::MAX))
-                        .insert(PlayerBlockDisplayComponent);
-                    }
-                );
-            }
-        );
+                    }, color: Color::BLACK.into(),
+                    ..Default::default()
+                }
+            ).with_children(
+                |parent| {
+                    parent.spawn_bundle(
+                        get_text_bundle(
+                            "Player",
+                            get_text_style(font.clone(), Color::WHITE),
+                            JustifyContent::FlexEnd,
+                        )
+                    );
+                    parent.spawn_bundle(
+                        get_text_bundle(
+                            "Health: 999999",
+                            get_text_style(font.clone(), Color::WHITE),
+                            JustifyContent::FlexStart,
+                        )
+                    ).insert(DisplayComponent::new("Health".to_string(), u8::MAX))
+                    .insert(PlayerHealthDisplayComponent);
+                    parent.spawn_bundle(
+                        get_text_bundle(
+                            "Block: 0",
+                            get_text_style(font.clone(), Color::WHITE),
+                            JustifyContent::FlexStart,
+                        )
+                    ).insert(DisplayComponent::new("Block".to_string(), u8::MAX))
+                    .insert(PlayerBlockDisplayComponent);
+                }
+            );
+        }
+    );
 
-        commands.insert_resource(NextState(NucleotideState::InitializingBattle));
-    }
-
-    if asset_server.get_load_state(font) == LoadState::Failed {
-        panic!("Failed to load font.");
-    }
+    commands.insert_resource(NextState(NucleotideState::InitializingBattle));
 
 }
 

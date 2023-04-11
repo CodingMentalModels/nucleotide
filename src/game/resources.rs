@@ -66,7 +66,7 @@ pub enum CharacterType {
 
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
-pub enum CharacterDisplayType {
+pub enum CharacterStatType {
     Health,
     Block,
     Energy,

@@ -12,7 +12,8 @@ impl Plugin for UIPlugin {
         app.add_plugin(EguiPlugin)
             .add_enter_system(NucleotideState::LoadingUI, configure_visuals)
             .add_enter_system(NucleotideState::LoadingUI, ui_load_system)
-            .add_system(render_system.run_in_state(NucleotideState::GeneAnimating));
+            .add_system(render_system.run_in_state(NucleotideState::GeneAnimating))
+            .add_system(display_state_system);
             // .add_system(battle_ui_system.run_in_state(NucleotideState::GeneAnimating));
             // .add_system(paused_ui_system.run_in_state(PongState::Paused))
             // .add_system(paused_input_system.run_in_state(PongState::Paused));
@@ -23,22 +24,29 @@ impl Plugin for UIPlugin {
 #[derive(Component, Clone)]
 pub struct DisplayComponent {
     pub prefix: String,
-    pub value: u8,
+    pub value: String,
 }
 
 impl DisplayComponent {
 
-    pub fn new(prefix: String, value: u8) -> Self {
+    pub fn new(prefix: String, value: String) -> Self {
         Self {
             prefix,
             value,
         }
     }
+
+    pub fn new_with_u8_value(prefix: String, value: u8) -> Self {
+        Self::new(
+            prefix,
+            value.to_string(),
+        )
+    }
 }
 
 
 #[derive(Component, Clone)]
-pub struct CharacterDisplayComponent(pub CharacterType, pub CharacterDisplayType);
+pub struct CharacterStatComponent(pub CharacterType, pub CharacterStatType);
 
 // End Components
 
@@ -88,6 +96,15 @@ fn ui_load_system(
                     JustifyContent::Center,
                 )
             );
+            
+            // State
+            parent.spawn_bundle(
+                get_text_bundle(
+                    &text,
+                    get_text_style(font.clone(), Color::WHITE),
+                    JustifyContent::Center,
+                )
+            ).insert(DisplayComponent::new("State".to_string(), "Uninitialized".to_string()));
 
             // Player UI
             parent.spawn_bundle(
@@ -122,24 +139,24 @@ fn ui_load_system(
                             get_text_style(font.clone(), Color::WHITE),
                             JustifyContent::FlexStart,
                         )
-                    ).insert(DisplayComponent::new("Energy".to_string(), u8::MAX))
-                    .insert(CharacterDisplayComponent(CharacterType::Player, CharacterDisplayType::Energy));
+                    ).insert(DisplayComponent::new_with_u8_value("Energy".to_string(), u8::MAX))
+                    .insert(CharacterStatComponent(CharacterType::Player, CharacterStatType::Energy));
                     parent.spawn_bundle(
                         get_text_bundle(
                             "Health: 999999",
                             get_text_style(font.clone(), Color::WHITE),
                             JustifyContent::FlexStart,
                         )
-                    ).insert(DisplayComponent::new("Health".to_string(), u8::MAX))
-                    .insert(CharacterDisplayComponent(CharacterType::Player, CharacterDisplayType::Health));
+                    ).insert(DisplayComponent::new_with_u8_value("Health".to_string(), u8::MAX))
+                    .insert(CharacterStatComponent(CharacterType::Player, CharacterStatType::Health));
                     parent.spawn_bundle(
                         get_text_bundle(
                             "Block: 0",
                             get_text_style(font.clone(), Color::WHITE),
                             JustifyContent::FlexStart,
                         )
-                    ).insert(DisplayComponent::new("Block".to_string(), u8::MAX))
-                    .insert(CharacterDisplayComponent(CharacterType::Player, CharacterDisplayType::Block));
+                    ).insert(DisplayComponent::new_with_u8_value("Block".to_string(), u8::MAX))
+                    .insert(CharacterStatComponent(CharacterType::Player, CharacterStatType::Block));
                 }
             );
 
@@ -176,24 +193,24 @@ fn ui_load_system(
                             get_text_style(font.clone(), Color::WHITE),
                             JustifyContent::FlexStart,
                         )
-                    ).insert(DisplayComponent::new("Energy".to_string(), u8::MAX))
-                    .insert(CharacterDisplayComponent(CharacterType::Enemy, CharacterDisplayType::Energy));
+                    ).insert(DisplayComponent::new_with_u8_value("Energy".to_string(), u8::MAX))
+                    .insert(CharacterStatComponent(CharacterType::Enemy, CharacterStatType::Energy));
                     parent.spawn_bundle(
                         get_text_bundle(
                             "Health: 999999",
                             get_text_style(font.clone(), Color::WHITE),
                             JustifyContent::FlexStart,
                         )
-                    ).insert(DisplayComponent::new("Health".to_string(), u8::MAX))
-                    .insert(CharacterDisplayComponent(CharacterType::Enemy, CharacterDisplayType::Health));
+                    ).insert(DisplayComponent::new_with_u8_value("Health".to_string(), u8::MAX))
+                    .insert(CharacterStatComponent(CharacterType::Enemy, CharacterStatType::Health));
                     parent.spawn_bundle(
                         get_text_bundle(
                             "Block: 0",
                             get_text_style(font.clone(), Color::WHITE),
                             JustifyContent::FlexStart,
                         )
-                    ).insert(DisplayComponent::new("Block".to_string(), u8::MAX))
-                    .insert(CharacterDisplayComponent(CharacterType::Enemy, CharacterDisplayType::Block));
+                    ).insert(DisplayComponent::new_with_u8_value("Block".to_string(), u8::MAX))
+                    .insert(CharacterStatComponent(CharacterType::Enemy, CharacterStatType::Block));
                 }
             );
         }
@@ -215,6 +232,17 @@ fn render_system(mut query: Query<(&DisplayComponent, &mut Text)>) {
         text.sections[0].value = format!("{}: {}", display.prefix.to_string(), display.value.to_string());
     }
 
+}
+
+fn display_state_system(
+    mut query: Query<(&mut DisplayComponent, &mut Text)>,
+    state: Res<CurrentState<NucleotideState>>,
+) {
+    for (display, mut text) in &mut query {
+        if display.prefix == "State" {
+            text.sections[0].value = format!("{}: {:?}", display.prefix.to_string(), state.0);
+        }
+    }
 }
 
 // Helper Functions

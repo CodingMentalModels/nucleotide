@@ -7,7 +7,7 @@ use crate::game::resources::*;
 use crate::game::constants::*;
 
 use super::specs::{GeneCommand, TargetType};
-use super::ui::{DisplayComponent, CharacterDisplayComponent};
+use super::ui::{DisplayComponent, CharacterStatComponent};
 
 pub type TargetEntity = Entity;
 
@@ -166,7 +166,7 @@ fn finished_handling_gene_system(mut commands: Commands) {
 
 fn render_character_display_system(
     character_display_query: Query<(Entity, &HealthComponent, &BlockComponent, &EnergyComponent)>,
-    mut display_query: Query<(&CharacterDisplayComponent, &mut DisplayComponent)>,
+    mut display_query: Query<(&CharacterStatComponent, &mut DisplayComponent)>,
     character_type_to_entity_map: Res<CharacterTypeToEntity>,
 ) {
 
@@ -174,9 +174,9 @@ fn render_character_display_system(
         for (display_component, mut display) in display_query.iter_mut() {
             if entity == character_type_to_entity_map.get(display_component.0) {
                 match display_component.1 {
-                    CharacterDisplayType::Health => display.value = health.0,
-                    CharacterDisplayType::Block => display.value = block.0,
-                    CharacterDisplayType::Energy => display.value = energy.energy_remaining,
+                    CharacterStatType::Health => display.value = health.0.to_string(),
+                    CharacterStatType::Block => display.value = block.0.to_string(),
+                    CharacterStatType::Energy => display.value = format!("{} / {}", energy.energy_remaining, energy.starting_energy),
                 }
             }
         }

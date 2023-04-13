@@ -1,6 +1,5 @@
 use bevy::{prelude::*, asset::LoadState};
-use bevy_egui::{egui, EguiContext, EguiPlugin};
-use iyes_loopless::prelude::*;
+use bevy_egui::{egui, EguiContexts, EguiPlugin};
 
 use crate::game::resources::*;
 use crate::game::constants::*;
@@ -9,12 +8,15 @@ pub struct UIPlugin;
 
 impl Plugin for UIPlugin {
     fn build(&self, app: &mut App) {
-        app.add_plugin(EguiPlugin)
-            .add_enter_system(NucleotideState::LoadingUI, configure_visuals)
-            .add_enter_system(NucleotideState::LoadingUI, ui_load_system)
-            .add_system(render_system.run_in_state(NucleotideState::GeneAnimating))
-            .add_system(display_state_system)
-            .add_system(paused_ui_system.run_in_state(NucleotideState::Paused));
+        app
+            .add_plugin(EguiPlugin)
+            .add_systems((
+                configure_visuals.in_schedule(OnEnter(NucleotideState::LoadingUI)),
+                ui_load_system.in_schedule(OnEnter(NucleotideState::LoadingUI)),
+                render_system.run_if(in_state(NucleotideState::GeneAnimating)),
+                display_state_system,
+                paused_ui_system.run_if(in_state(NucleotideState::Paused))
+            ));
     }
 }
 
@@ -49,7 +51,7 @@ pub struct CharacterStatComponent(pub CharacterType, pub CharacterStatType);
 // End Components
 
 // Systems
-fn configure_visuals(mut ctx: ResMut<EguiContext>) {
+fn configure_visuals(mut ctx: EguiContexts) {
     ctx.ctx_mut().set_visuals(
         egui::Visuals {
             window_rounding: 0.0.into(),
@@ -69,9 +71,9 @@ fn ui_load_system(
         panic!("Failed to load font: {:?}", asset_server.get_load_state(font.clone()));
     }
 
-    commands.spawn_bundle(Camera2dBundle::default());
+    commands.spawn(Camera2dBundle::default());
 
-    commands.spawn_bundle(
+    commands.spawn(
         NodeBundle {
             style: Style {
                 size: Size::new(Val::Percent(100.0), Val::Percent(100.0)),
@@ -79,7 +81,7 @@ fn ui_load_system(
                 justify_content: JustifyContent::SpaceBetween,
                 align_items: AlignItems::FlexEnd,
                 ..Default::default()
-            }, color: Color::NONE.into(),
+            }, background_color: Color::NONE.into(),
             ..Default::default()
         }
     ).with_children(
@@ -87,7 +89,7 @@ fn ui_load_system(
             let mut text = ALPHA_LOWER.to_string();
             text.push(BETA_UPPER);
             text.push(GAMMA_UPPER);
-            parent.spawn_bundle(
+            parent.spawn(
                 get_text_bundle(
                     &text,
                     get_text_style(font.clone(), Color::WHITE),
@@ -96,7 +98,7 @@ fn ui_load_system(
             );
             
             // State
-            parent.spawn_bundle(
+            parent.spawn(
                 get_text_bundle(
                     &text,
                     get_text_style(font.clone(), Color::WHITE),
@@ -105,7 +107,7 @@ fn ui_load_system(
             ).insert(DisplayComponent::new("State".to_string(), "Uninitialized".to_string()));
 
             // Player UI
-            parent.spawn_bundle(
+            parent.spawn(
                 NodeBundle {
                     style: Style {
                         size: Size::new(Val::Percent(50.0), Val::Percent(50.0)),
@@ -119,19 +121,19 @@ fn ui_load_system(
                         justify_content: JustifyContent::FlexStart,
                         align_items: AlignItems::FlexStart,
                         ..Default::default()
-                    }, color: Color::BLACK.into(),
+                    }, background_color: Color::BLACK.into(),
                     ..Default::default()
                 }
             ).with_children(
                 |parent| {
-                    parent.spawn_bundle(
+                    parent.spawn(
                         get_text_bundle(
                             "Player",
                             get_text_style(font.clone(), Color::WHITE),
                             JustifyContent::FlexStart,
                         )
                     );
-                    parent.spawn_bundle(
+                    parent.spawn(
                         get_text_bundle(
                             "Energy: 0",
                             get_text_style(font.clone(), Color::WHITE),
@@ -139,7 +141,7 @@ fn ui_load_system(
                         )
                     ).insert(DisplayComponent::new_with_u8_value("Energy".to_string(), u8::MAX))
                     .insert(CharacterStatComponent(CharacterType::Player, CharacterStatType::Energy));
-                    parent.spawn_bundle(
+                    parent.spawn(
                         get_text_bundle(
                             "Health: 999999",
                             get_text_style(font.clone(), Color::WHITE),
@@ -147,7 +149,7 @@ fn ui_load_system(
                         )
                     ).insert(DisplayComponent::new_with_u8_value("Health".to_string(), u8::MAX))
                     .insert(CharacterStatComponent(CharacterType::Player, CharacterStatType::Health));
-                    parent.spawn_bundle(
+                    parent.spawn(
                         get_text_bundle(
                             "Block: 0",
                             get_text_style(font.clone(), Color::WHITE),
@@ -159,7 +161,7 @@ fn ui_load_system(
             );
 
             // Enemy UI
-            parent.spawn_bundle(
+            parent.spawn(
                 NodeBundle {
                     style: Style {
                         size: Size::new(Val::Percent(30.0), Val::Percent(30.0)),
@@ -173,19 +175,19 @@ fn ui_load_system(
                         justify_content: JustifyContent::FlexEnd,
                         align_items: AlignItems::FlexEnd,
                         ..Default::default()
-                    }, color: Color::BLACK.into(),
+                    }, background_color: Color::BLACK.into(),
                     ..Default::default()
                 }
             ).with_children(
                 |parent| {
-                    parent.spawn_bundle(
+                    parent.spawn(
                         get_text_bundle(
                             "Enemy",
                             get_text_style(font.clone(), Color::WHITE),
                             JustifyContent::FlexStart,
                         )
                     );
-                    parent.spawn_bundle(
+                    parent.spawn(
                         get_text_bundle(
                             "Energy: 0",
                             get_text_style(font.clone(), Color::WHITE),
@@ -193,7 +195,7 @@ fn ui_load_system(
                         )
                     ).insert(DisplayComponent::new_with_u8_value("Energy".to_string(), u8::MAX))
                     .insert(CharacterStatComponent(CharacterType::Enemy, CharacterStatType::Energy));
-                    parent.spawn_bundle(
+                    parent.spawn(
                         get_text_bundle(
                             "Health: 999999",
                             get_text_style(font.clone(), Color::WHITE),
@@ -201,7 +203,7 @@ fn ui_load_system(
                         )
                     ).insert(DisplayComponent::new_with_u8_value("Health".to_string(), u8::MAX))
                     .insert(CharacterStatComponent(CharacterType::Enemy, CharacterStatType::Health));
-                    parent.spawn_bundle(
+                    parent.spawn(
                         get_text_bundle(
                             "Block: 0",
                             get_text_style(font.clone(), Color::WHITE),
@@ -214,15 +216,15 @@ fn ui_load_system(
         }
     );
 
-    commands.insert_resource(NextState(NucleotideState::InitializingBattle));
+    commands.insert_resource(NextState(Some(NucleotideState::InitializingBattle)));
 
 }
 
-// fn battle_ui_system(mut egui_ctx: ResMut<EguiContext>, query: Query<&Text>) {
-//     egui::TopBottomPanel::top("top_panel").show(egui_ctx.ctx_mut(), |ui| {
-//         ui.label("Nucleotide");
-//     });
-// }
+fn battle_ui_system(mut egui_ctx: EguiContexts, query: Query<&Text>) {
+    egui::TopBottomPanel::top("top_panel").show(egui_ctx.ctx_mut(), |ui| {
+        ui.label("Nucleotide");
+    });
+}
 
 fn render_system(mut query: Query<(&DisplayComponent, &mut Text)>) {
 
@@ -234,7 +236,7 @@ fn render_system(mut query: Query<(&DisplayComponent, &mut Text)>) {
 
 fn display_state_system(
     mut query: Query<(&mut DisplayComponent, &mut Text)>,
-    state: Res<CurrentState<NucleotideState>>,
+    state: Res<State<NucleotideState>>,
 ) {
     for (display, mut text) in &mut query {
         if display.prefix == "State" {
@@ -244,7 +246,7 @@ fn display_state_system(
 }
 
 fn paused_ui_system(
-    mut egui_ctx: ResMut<EguiContext>,
+    mut egui_ctx: EguiContexts,
 ) {
     egui::Area::new("pause-menu")
         .anchor(egui::Align2::CENTER_CENTER, egui::Vec2::ZERO)
@@ -278,7 +280,7 @@ fn get_text_bundle(
     TextBundle::from_section(
         text.to_string(),
         text_style
-    ).with_text_alignment(TextAlignment::TOP_CENTER)
+    ).with_text_alignment(TextAlignment::Center)
     .with_style(
         Style {
             align_self: AlignSelf::FlexEnd,

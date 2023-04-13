@@ -1,7 +1,6 @@
 use std::collections::BTreeMap;
 
 use bevy::prelude::*;
-use iyes_loopless::prelude::*;
 
 use crate::game::resources::*;
 use crate::game::constants::*;
@@ -21,14 +20,16 @@ impl Plugin for NucleotidePlugin {
         .insert_resource(GeneCommandQueue::default())
         .add_event::<DamageEvent>()
         .add_event::<BlockEvent>()
-        .add_enter_system(NucleotideState::InitializingBattle, initialize_battle_system)
-        .add_enter_system(NucleotideState::CharacterActing, character_acting_system)
-        .add_enter_system(NucleotideState::GeneLoading, gene_loading_system)
-        .add_enter_system(NucleotideState::GeneCommandHandling, handle_gene_commands_system)
-        .add_enter_system(NucleotideState::GeneEventHandling, update_health_system)
-        .add_system(finished_handling_gene_system.run_in_state(NucleotideState::GeneEventHandling))
-        .add_enter_system(NucleotideState::GeneAnimating, render_character_display_system)
-        .add_system(finished_animating_gene_system.run_in_state(NucleotideState::GeneAnimating));
+        .add_systems((
+            initialize_battle_system.in_schedule(OnEnter(NucleotideState::InitializingBattle)),
+            character_acting_system.in_schedule(OnEnter(NucleotideState::CharacterActing)),
+            gene_loading_system.in_schedule(OnEnter(NucleotideState::GeneLoading)),
+            handle_gene_commands_system.in_schedule(OnEnter(NucleotideState::GeneCommandHandling)),
+            update_health_system.in_schedule(OnEnter(NucleotideState::GeneEventHandling)),
+            finished_handling_gene_system.run_if(in_state(NucleotideState::GeneEventHandling)),
+            render_character_display_system.in_schedule(OnEnter(NucleotideState::GeneAnimating)),
+            finished_animating_gene_system.run_if(in_state(NucleotideState::GeneAnimating)),
+        ));
     }
 }
 
@@ -63,7 +64,7 @@ fn initialize_battle_system(mut commands: Commands, enemy_specs: Res<EnemySpecs>
     commands.insert_resource(CharacterActing(player_entity));
     let character_type_to_entity: Vec<_> = vec![(CharacterType::Player, player_entity), (CharacterType::Enemy, enemy_entity)].into_iter().collect();
     commands.insert_resource(CharacterTypeToEntity(character_type_to_entity));
-    commands.insert_resource(NextState(NucleotideState::CharacterActing));
+    commands.insert_resource(NextState(Some(NucleotideState::CharacterActing)));
 }
 
 fn character_acting_system(
@@ -85,7 +86,7 @@ fn character_acting_system(
         energy.energy_remaining -= 1;
     }
 
-    commands.insert_resource(NextState(NucleotideState::GeneLoading));
+    commands.insert_resource(NextState(Some(NucleotideState::GeneLoading)));
 
 }
 
@@ -113,7 +114,7 @@ fn gene_loading_system(
             .map(|gene_command| targets.iter().map(|target| (gene_command.clone(), target.clone()))).flatten().collect()
     );
 
-    commands.insert_resource(NextState(NucleotideState::GeneCommandHandling));
+    commands.insert_resource(NextState(Some(NucleotideState::GeneCommandHandling)));
 
 }
 
@@ -138,7 +139,7 @@ fn handle_gene_commands_system(
 
     gene_command_queue.0.clear();
 
-    commands.insert_resource(NextState(NucleotideState::GeneEventHandling));
+    commands.insert_resource(NextState(Some(NucleotideState::GeneEventHandling)));
 }
 
 fn update_health_system(
@@ -161,7 +162,7 @@ fn update_health_system(
 }
 
 fn finished_handling_gene_system(mut commands: Commands) {
-    commands.insert_resource(NextState(NucleotideState::GeneAnimating));
+    commands.insert_resource(NextState(Some(NucleotideState::GeneAnimating)));
 }
 
 fn render_character_display_system(
@@ -184,7 +185,7 @@ fn render_character_display_system(
 }
 
 fn finished_animating_gene_system(mut commands: Commands) {
-    commands.insert_resource(NextState(NucleotideState::CharacterActing));
+    commands.insert_resource(NextState(Some(NucleotideState::CharacterActing)));
 }
 
 // End Systems
@@ -233,7 +234,7 @@ pub struct BlockComponent(pub u8);
 // Helper Functions
 
 fn instantiate_player(mut commands: &mut Commands, genome: Vec<String>) -> Entity {
-    commands.spawn()
+    commands.spawn_empty()
         .insert(PlayerComponent)
         .insert(GenomeComponent(genome))
         .insert(GenomePointerComponent(0))
@@ -246,7 +247,7 @@ fn instantiate_player(mut commands: &mut Commands, genome: Vec<String>) -> Entit
 fn instantiate_enemy(mut commands: &mut Commands, enemy_specs: Res<EnemySpecs>, gene_specs: Res<GeneSpecs>, enemy_name: &str) -> Entity {
     let enemy_spec = enemy_specs.0.get(enemy_name).expect("Enemy spec not found");
     let genome = enemy_spec.get_genome().iter().map(|s| gene_specs.0.get(s).expect("Gene spec not found").get_name().clone()).collect();
-    commands.spawn()
+    commands.spawn_empty()
         .insert(EnemyComponent)
         .insert(GenomeComponent(genome))
         .insert(GenomePointerComponent(0))

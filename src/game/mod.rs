@@ -5,3 +5,4 @@ pub mod ui;
 pub mod constants;
 pub mod specs;
 pub mod assets;
+pub mod pause;

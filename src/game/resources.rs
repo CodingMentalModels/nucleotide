@@ -6,6 +6,10 @@ use crate::game::specs::GeneCommand;
 
 use super::specs::{EnemySpec, GeneSpec};
 
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+pub struct PausedState(pub NucleotideState);
+
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub enum NucleotideState {
     LoadingUI,

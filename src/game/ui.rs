@@ -13,10 +13,8 @@ impl Plugin for UIPlugin {
             .add_enter_system(NucleotideState::LoadingUI, configure_visuals)
             .add_enter_system(NucleotideState::LoadingUI, ui_load_system)
             .add_system(render_system.run_in_state(NucleotideState::GeneAnimating))
-            .add_system(display_state_system);
-            // .add_system(battle_ui_system.run_in_state(NucleotideState::GeneAnimating));
-            // .add_system(paused_ui_system.run_in_state(PongState::Paused))
-            // .add_system(paused_input_system.run_in_state(PongState::Paused));
+            .add_system(display_state_system)
+            .add_system(paused_ui_system.run_in_state(NucleotideState::Paused));
     }
 }
 
@@ -244,6 +242,31 @@ fn display_state_system(
         }
     }
 }
+
+fn paused_ui_system(
+    mut egui_ctx: ResMut<EguiContext>,
+) {
+    egui::Area::new("pause-menu")
+        .anchor(egui::Align2::CENTER_CENTER, egui::Vec2::ZERO)
+        .show(
+            egui_ctx.ctx_mut(), 
+            |ui| {
+                ui.with_layout(
+                    egui::Layout::top_down(egui::Align::Center), |ui| {
+                        ui.label(
+                            egui::RichText::new("Paused")
+                            .size(20.)
+                            .text_style(egui::TextStyle::Heading)
+                            .underline()
+                            .color(egui::Color32::BLACK)
+                        );
+
+                    }
+                );
+            }
+        );
+}
+
 
 // Helper Functions
 

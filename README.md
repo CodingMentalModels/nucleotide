@@ -1,6 +1,6 @@
 # nucleotide
 
-Roguelike autobattler in which player is drafting and rearranging the genetic code of their character and battling it against foes.
+Roguelite autobattler in which player is drafting and rearranging the genetic code of their character and battling it against foes.
 
 Mechanics:
 - There are genes which have some sort of effect, e.g.
@@ -61,15 +61,7 @@ State Machine that controls Game Phases:
         - GeneType
         - Text
         - Target
-        - GeneCommand
-
-GeneCommands
-    - Damage(u8)
-    - Heal(u8)
-    - Status(StatusEffect, u8)
-    - JumpForwardNGenes(u8)
-    - ReverseGeneProcessing
-    - GainEnergy(u8)
+        - GeneCommands
 
 
 ### Systems
@@ -80,7 +72,10 @@ GeneCommands
     - input_handling_system
     - ai_system
     - control_system
-    - gene_expression_system
+    - gene_expression_system - Convert GeneCommands to Events for various systems
+    - HealSystem
+    - DamageSystem
+    - ...
 - InBattle -> Drafting
     - drafting_options_generation_system
 - Drafting
@@ -103,6 +98,13 @@ GeneCommands
 - GamePhase
 - Gene Pool
 - Enemy Pool
+- GeneCommands
+    - Damage(u8)
+    - Heal(u8)
+    - Status(StatusEffect, u8)
+    - JumpForwardNGenes(u8)
+    - ReverseGeneProcessing
+    - GainEnergy(u8)
 
 
 ## Implementation Plan

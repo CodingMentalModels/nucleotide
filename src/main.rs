@@ -2,6 +2,7 @@ mod game;
 
 use bevy::prelude::*;
 use game::assets::AssetsPlugin;
+use game::pause::PausePlugin;
 use iyes_loopless::prelude::*;
 
 use crate::game::battle::NucleotidePlugin;
@@ -15,5 +16,6 @@ fn main() {
         .add_plugin(AssetsPlugin)
         .add_plugin(UIPlugin)
         .add_plugin(NucleotidePlugin)
+        .add_plugin(PausePlugin)
         .run();
 }

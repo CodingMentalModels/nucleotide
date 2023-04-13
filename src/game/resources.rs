@@ -7,13 +7,14 @@ use crate::game::specs::GeneCommand;
 use super::specs::{EnemySpec, GeneSpec};
 
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+#[derive(Debug, Default, Clone, Copy, PartialEq, Eq, Hash, Resource)]
 pub struct PausedState(pub NucleotideState);
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+#[derive(Debug, Default, Clone, Copy, PartialEq, Eq, Hash, States, Resource)]
 pub enum NucleotideState {
-    LoadingUI,
+    #[default]
     LoadingAssets,
+    LoadingUI,
     Menu,
     Paused,
     Drafting,
@@ -28,19 +29,19 @@ pub enum NucleotideState {
 }
 
 
-#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+#[derive(Debug, Clone, PartialEq, Eq, Hash, Resource)]
 pub struct CharacterActing(pub Entity);
 
-#[derive(Debug, Default, Clone, PartialEq, Eq, Hash)]
+#[derive(Debug, Default, Clone, PartialEq, Eq, Hash, Resource)]
 pub struct GeneCommandQueue(pub Vec<(GeneCommand, Entity)>);
 
-#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+#[derive(Debug, Clone, PartialEq, Eq, Hash, Resource)]
 pub struct EnemySpecs(pub BTreeMap<String, EnemySpec>);
 
-#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+#[derive(Debug, Clone, PartialEq, Eq, Hash, Resource)]
 pub struct GeneSpecs(pub BTreeMap<String, GeneSpec>);
 
-#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+#[derive(Debug, Clone, PartialEq, Eq, Hash, Resource)]
 pub struct CharacterTypeToEntity(pub Vec<(CharacterType, Entity)>);
 
 impl CharacterTypeToEntity {

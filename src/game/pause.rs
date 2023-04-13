@@ -1,6 +1,4 @@
-
 use bevy::{prelude::*};
-use iyes_loopless::prelude::*;
 
 use crate::game::resources::*;
 
@@ -23,15 +21,15 @@ impl Plugin for PausePlugin {
 fn pause_input_system(
     mut commands: Commands,
     keyboard_input: Res<Input<KeyCode>>,
-    current_state: Res<CurrentState<NucleotideState>>,
+    current_state: Res<State<NucleotideState>>,
     mut paused_state: ResMut<PausedState>,
 ) {
     if keyboard_input.just_pressed(KeyCode::Escape) {
         if current_state.0 == NucleotideState::Paused {
-            commands.insert_resource(NextState(paused_state.0));
+            commands.insert_resource(NextState(Some(paused_state.0)));
         } else {
             paused_state.0 = current_state.0;
-            commands.insert_resource(NextState(NucleotideState::Paused));
+            commands.insert_resource(NextState(Some(NucleotideState::Paused)));
         }
     }
 }

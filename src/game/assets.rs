@@ -1,7 +1,6 @@
 use std::fs;
 use std::path::Path;
-use bevy::{prelude::*, asset::LoadState};
-use iyes_loopless::prelude::*;
+use bevy::{prelude::*};
 
 use crate::game::resources::*;
 use crate::game::constants::*;
@@ -16,8 +15,10 @@ pub struct AssetsPlugin;
 impl Plugin for AssetsPlugin {
     fn build(&self, app: &mut App) {
         app
-            .add_enter_system(NucleotideState::LoadingAssets, generate_example_specs_system)
-            .add_enter_system(NucleotideState::LoadingAssets, load_assets_system);
+            .add_systems((
+                generate_example_specs_system.in_schedule(OnEnter(NucleotideState::LoadingAssets)),
+                load_assets_system.in_schedule(OnEnter(NucleotideState::LoadingAssets))
+            ));
     }
 }
 
@@ -64,7 +65,7 @@ fn load_assets_system(mut commands: Commands) {
     commands.insert_resource(EnemySpecs(enemy_specs));
     commands.insert_resource(GeneSpecs(gene_specs));
 
-    commands.insert_resource(NextState(NucleotideState::LoadingUI));
+    commands.insert_resource(NextState(Some(NucleotideState::LoadingUI)));
 }
 
 // End Systems

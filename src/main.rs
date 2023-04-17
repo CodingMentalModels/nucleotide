@@ -2,6 +2,7 @@ mod game;
 
 use bevy::prelude::*;
 use game::assets::AssetsPlugin;
+use game::input::InputPlugin;
 use game::pause::PausePlugin;
 
 use crate::game::battle::NucleotidePlugin;
@@ -14,6 +15,7 @@ fn main() {
         .add_state::<NucleotideState>()
         .add_plugin(AssetsPlugin)
         .add_plugin(UIPlugin)
+        .add_plugin(InputPlugin)
         .add_plugin(NucleotidePlugin)
         .add_plugin(PausePlugin)
         .run();

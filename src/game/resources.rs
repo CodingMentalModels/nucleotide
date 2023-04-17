@@ -51,6 +51,11 @@ impl CharacterTypeToEntity {
             .expect("All character types should be registered when get() is called")
     }
 
+    pub fn get_character_type(&self, entity: Entity) -> CharacterType {
+        self.0.iter().find(|(_, e)| *e == entity).map(|(ct, _)| *ct)
+            .expect("All entities should be registered when get_character_type() is called")
+    }
+
     pub fn get_next(&self, entity: Entity) -> Entity {
         let index = self.0.iter().position(|(_, e)| *e == entity).unwrap();
         let next_index = (index + 1) % self.0.len();

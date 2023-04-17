@@ -237,10 +237,26 @@ fn render_system(mut query: Query<(&DisplayComponent, &mut Text)>) {
 fn display_state_system(
     mut query: Query<(&mut DisplayComponent, &mut Text)>,
     state: Res<State<NucleotideState>>,
+    character_acting: Option<Res<CharacterActing>>,
+    character_type_to_entity: Option<Res<CharacterTypeToEntity>>,
+    paused_state: Res<PausedState>,
 ) {
     for (display, mut text) in &mut query {
         if display.prefix == "State" {
-            text.sections[0].value = format!("{}: {:?}", display.prefix.to_string(), state.0);
+            let suffix = if state.0 == NucleotideState::Paused {
+                format!("Paused ({:?})", paused_state.0)
+            } else {
+                format!("{:?}", state.0)
+            };
+            match (character_acting.as_ref(), character_type_to_entity.as_ref()) {
+                (Some(character_acting), Some(character_type_to_entity)) => {
+                    let acting = character_type_to_entity.get_character_type(character_acting.0);
+                    text.sections[0].value = format!("{}: {}\nCharacter Acting: {:?}", display.prefix.to_string(), suffix, acting);
+                },
+                _ => {
+                    text.sections[0].value = format!("{}: {}", display.prefix.to_string(), suffix);
+                }
+            }
         }
     }
 }

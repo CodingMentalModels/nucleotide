@@ -6,3 +6,4 @@ pub mod constants;
 pub mod specs;
 pub mod assets;
 pub mod pause;
+pub mod input;

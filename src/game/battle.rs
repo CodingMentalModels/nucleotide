@@ -4,6 +4,7 @@ use bevy::prelude::*;
 
 use crate::game::resources::*;
 use crate::game::constants::*;
+use crate::game::input::PauseUnpauseEvent;
 
 use super::specs::{GeneCommand, TargetType};
 use super::ui::{DisplayComponent, CharacterStatComponent};
@@ -15,8 +16,6 @@ pub struct NucleotidePlugin;
 impl Plugin for NucleotidePlugin {
     fn build(&self, app: &mut App) {
         app
-        .insert_resource(Time::default())
-        .insert_resource(Input::<KeyCode>::default())
         .insert_resource(GeneCommandQueue::default())
         .add_event::<DamageEvent>()
         .add_event::<BlockEvent>()
@@ -72,6 +71,7 @@ fn character_acting_system(
     mut character_acting: ResMut<CharacterActing>,
     character_type_to_entity_map: Res<CharacterTypeToEntity>,
     mut query: Query<(Entity, &mut EnergyComponent)>,
+    mut pause_unpause_event_writer: EventWriter<PauseUnpauseEvent>,
 ) {
 
     let (
@@ -87,6 +87,7 @@ fn character_acting_system(
     }
 
     commands.insert_resource(NextState(Some(NucleotideState::GeneLoading)));
+    pause_unpause_event_writer.send(PauseUnpauseEvent);
 
 }
 
@@ -97,6 +98,7 @@ fn gene_loading_system(
     mut gene_command_queue: ResMut<GeneCommandQueue>,
     gene_specs: Res<GeneSpecs>,
     query: Query<(Entity, &GenomeComponent, &GenomePointerComponent)>,
+    mut pause_unpause_event_writer: EventWriter<PauseUnpauseEvent>,
 ) {
 
     let (
@@ -115,6 +117,7 @@ fn gene_loading_system(
     );
 
     commands.insert_resource(NextState(Some(NucleotideState::GeneCommandHandling)));
+    pause_unpause_event_writer.send(PauseUnpauseEvent);
 
 }
 
@@ -122,7 +125,8 @@ fn handle_gene_commands_system(
     mut commands: Commands,
     mut gene_command_queue: ResMut<GeneCommandQueue>,
     mut damage_event_writer: EventWriter<DamageEvent>,
-    mut block_event_writer: EventWriter<BlockEvent>
+    mut block_event_writer: EventWriter<BlockEvent>,
+    mut pause_unpause_event_writer: EventWriter<PauseUnpauseEvent>,
 ) {
 
     for (gene_command, target_entity) in gene_command_queue.0.iter() {
@@ -140,6 +144,7 @@ fn handle_gene_commands_system(
     gene_command_queue.0.clear();
 
     commands.insert_resource(NextState(Some(NucleotideState::GeneEventHandling)));
+    pause_unpause_event_writer.send(PauseUnpauseEvent);
 }
 
 fn update_health_system(
@@ -161,7 +166,9 @@ fn update_health_system(
     }
 }
 
-fn finished_handling_gene_system(mut commands: Commands) {
+fn finished_handling_gene_system(
+    mut commands: Commands,
+) {
     commands.insert_resource(NextState(Some(NucleotideState::GeneAnimating)));
 }
 
@@ -184,7 +191,9 @@ fn render_character_display_system(
     }
 }
 
-fn finished_animating_gene_system(mut commands: Commands) {
+fn finished_animating_gene_system(
+    mut commands: Commands,
+) {
     commands.insert_resource(NextState(Some(NucleotideState::CharacterActing)));
 }
 

@@ -5,7 +5,7 @@ use bevy::{prelude::*};
 use crate::game::specs::GeneCommand;
 use crate::game::constants::*;
 
-use super::specs::{EnemySpec, GeneSpec};
+use super::specs::{EnemySpec, GeneSpec, GeneName, EnemyName};
 
 pub type Symbol = char;
 
@@ -19,6 +19,7 @@ pub enum NucleotideState {
     LoadingUI,
     Menu,
     Paused,
+    InstantiateMeta,
     Drafting,
     InitializingBattle,
     CharacterActing,
@@ -32,6 +33,54 @@ pub enum NucleotideState {
 
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash, Resource)]
+pub struct EnemyQueue(pub Vec<EnemyName>);
+
+impl EnemyQueue {
+
+    pub fn pop(&mut self) -> Option<EnemyName> {
+        self.0.pop()
+    }
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Hash, Resource)]
+pub struct Player {
+    name: String,
+    health: u8,
+    energy: u8,
+    genome: Vec<GeneName>,
+}
+
+impl Player {
+
+    pub fn new(name: String, health: u8, energy: u8, genome: Vec<GeneName>) -> Self {
+        Self {
+            name,
+            health,
+            energy,
+            genome,
+        }
+    }
+
+    pub fn get_name(&self) -> &String {
+        &self.name
+    }
+
+    pub fn get_health(&self) -> u8 {
+        self.health
+    }
+
+    pub fn get_energy(&self) -> u8 {
+        self.energy
+    }
+
+    pub fn get_genome(&self) -> Vec<GeneName> {
+        self.genome.clone()
+    }
+
+}
+
+
+#[derive(Debug, Clone, PartialEq, Eq, Hash, Resource)]
 pub struct CharacterActing(pub Entity);
 
 #[derive(Debug, Default, Clone, PartialEq, Eq, Hash, Resource)]
@@ -39,6 +88,18 @@ pub struct GeneCommandQueue(pub Vec<(GeneCommand, Entity)>);
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash, Resource)]
 pub struct EnemySpecs(pub BTreeMap<String, EnemySpec>);
+
+impl EnemySpecs {
+
+    pub fn get(&self, enemy_name: EnemyName) -> &EnemySpec {
+        self.0.get(&enemy_name.to_string()).expect("All enemy names should be registered when get() is called")
+    }
+
+    pub fn get_names(&self) -> Vec<EnemyName> {
+        self.0.keys().map(|s| s.clone()).collect()
+    }
+
+}
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash, Resource)]
 pub struct GeneSpecs(pub GeneSpecLookup);

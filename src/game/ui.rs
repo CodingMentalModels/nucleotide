@@ -48,6 +48,37 @@ impl DisplayComponent {
 #[derive(Component, Clone)]
 pub struct CharacterStatComponent(pub CharacterType, pub CharacterStatType);
 
+
+#[derive(Component, Clone)]
+pub struct GeneDisplayComponent {
+    character_type: CharacterType,
+    genes: Vec<Symbol>,
+    active_gene: Option<Symbol>,
+}
+
+impl GeneDisplayComponent {
+
+    pub fn new(character_type: CharacterType, genes: Vec<Symbol>) -> Self {
+        Self {
+            character_type,
+            genes,
+            active_gene: None,
+        }
+    }
+
+    pub fn get_character_type(&self) -> CharacterType {
+        self.character_type
+    }
+
+    pub fn get_genes(&self) -> &Vec<Symbol> {
+        &self.genes
+    }
+
+    pub fn get_active_gene(&self) -> Option<Symbol> {
+        self.active_gene
+    }
+}
+
 // End Components
 
 // Systems
@@ -117,7 +148,7 @@ fn ui_load_system(
                             top: Val::Percent(50.0),
                             ..Default::default()
                         },
-                        flex_direction: FlexDirection::ColumnReverse,
+                        flex_direction: FlexDirection::Column,
                         justify_content: JustifyContent::FlexStart,
                         align_items: AlignItems::FlexStart,
                         ..Default::default()
@@ -133,6 +164,14 @@ fn ui_load_system(
                             JustifyContent::FlexStart,
                         )
                     );
+                    parent.spawn(
+                        get_text_bundle(
+                            "Genes: ",
+                            get_text_style(font.clone(), Color::WHITE),
+                            JustifyContent::FlexStart,
+                        )
+                    ).insert(DisplayComponent::new("Genes".to_string(), "XXXX".to_string()))
+                    .insert(GeneDisplayComponent::new(CharacterType::Player, player_genes));
                     parent.spawn(
                         get_text_bundle(
                             "Energy: 0",
@@ -171,9 +210,9 @@ fn ui_load_system(
                             top: Val::Percent(0.0),
                             ..Default::default()
                         },
-                        flex_direction: FlexDirection::ColumnReverse,
-                        justify_content: JustifyContent::FlexEnd,
-                        align_items: AlignItems::FlexEnd,
+                        flex_direction: FlexDirection::Column,
+                        justify_content: JustifyContent::FlexStart,
+                        align_items: AlignItems::FlexStart,
                         ..Default::default()
                     }, background_color: Color::BLACK.into(),
                     ..Default::default()
@@ -299,9 +338,9 @@ fn get_text_bundle(
     ).with_text_alignment(TextAlignment::Center)
     .with_style(
         Style {
-            align_self: AlignSelf::FlexEnd,
+            align_self: AlignSelf::FlexStart,
             justify_content: justify_content,
-            margin: UiRect::all(Val::Px(25.0)),
+            margin: UiRect::all(Val::Px(5.0)),
             ..Default::default()
         }
     )
@@ -310,7 +349,7 @@ fn get_text_bundle(
 fn get_text_style(font: Handle<Font>, color: Color) -> TextStyle {
     TextStyle {
         font: font,
-        font_size: 30.0,
+        font_size: 20.0,
         color: color,
     }
 }

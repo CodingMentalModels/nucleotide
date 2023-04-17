@@ -6,6 +6,8 @@ use crate::game::resources::*;
 use crate::game::constants::*;
 use crate::game::input::PauseUnpauseEvent;
 
+use super::specs::EnemyName;
+use super::specs::EnemySpec;
 use super::specs::{GeneCommand, TargetType};
 use super::ui::{DisplayComponent, CharacterStatComponent};
 
@@ -54,11 +56,22 @@ struct BlockEvent(TargetEntity, u8);
 
 // Systems
 
-fn initialize_battle_system(mut commands: Commands, enemy_specs: Res<EnemySpecs>, gene_specs: Res<GeneSpecs>) {
+fn initialize_battle_system(
+    mut commands: Commands,
+    enemy_specs: Res<EnemySpecs>,
+    gene_specs: Res<GeneSpecs>,
+    player: Res<Player>,
+    mut enemy_queue: ResMut<EnemyQueue>,
+) {
 
     let player_genome = vec!["Sting".to_string(), "Block".to_string()];
-    let player_entity = instantiate_player(&mut commands, player_genome);
-    let enemy_entity = instantiate_enemy(&mut commands, enemy_specs, gene_specs, "Enemy");
+    let player_entity = instantiate_player(&mut commands, player);
+    let enemy_entity = instantiate_enemy(
+        &mut commands,
+        enemy_queue.pop().expect("There should always be more enemies!"),
+        gene_specs.0,
+        enemy_specs
+    );
 
     commands.insert_resource(CharacterActing(player_entity));
     let character_type_to_entity: Vec<_> = vec![(CharacterType::Player, player_entity), (CharacterType::Enemy, enemy_entity)].into_iter().collect();
@@ -242,20 +255,20 @@ pub struct BlockComponent(pub u8);
 
 // Helper Functions
 
-fn instantiate_player(mut commands: &mut Commands, genome: Vec<String>) -> Entity {
+fn instantiate_player(mut commands: &mut Commands, player: Res<Player>) -> Entity {
     commands.spawn_empty()
         .insert(PlayerComponent)
-        .insert(GenomeComponent(genome))
+        .insert(GenomeComponent(player.get_genome()))
         .insert(GenomePointerComponent(0))
-        .insert(HealthComponent(STARTING_PLAYER_HEALTH))
+        .insert(HealthComponent(player.get_health()))
         .insert(BlockComponent(0))
-        .insert(EnergyComponent::new(STARTING_PLAYER_ENERGY, STARTING_PLAYER_ENERGY))
+        .insert(EnergyComponent::new(player.get_energy(), player.get_energy()))
         .id()
 }
 
-fn instantiate_enemy(mut commands: &mut Commands, enemy_specs: Res<EnemySpecs>, gene_specs: Res<GeneSpecs>, enemy_name: &str) -> Entity {
-    let enemy_spec = enemy_specs.0.get(enemy_name).expect("Enemy spec not found");
-    let genome = enemy_spec.get_genome().iter().map(|s| gene_specs.0.get_spec_from_name(s).expect("Gene spec not found").get_name().clone()).collect();
+fn instantiate_enemy(mut commands: &mut Commands, enemy_name: EnemyName, gene_lookup: GeneSpecLookup, enemy_specs: Res<EnemySpecs>) -> Entity {
+    let enemy_spec = enemy_specs.get(enemy_name);
+    let genome = enemy_spec.get_genome().iter().map(|s| gene_lookup.get_spec_from_name(s).expect("Gene spec not found").get_name().clone()).collect();
     commands.spawn_empty()
         .insert(EnemyComponent)
         .insert(GenomeComponent(genome))

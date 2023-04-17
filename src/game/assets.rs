@@ -60,10 +60,10 @@ fn load_assets_system(mut commands: Commands) {
         .collect::<Result<Vec<GeneSpec>, _>>().expect("Error parsing gene specs");
 
     let enemy_specs = enemies.into_iter().map(|s| (s.get_name().clone(), s)).collect();
-    let gene_specs = genes.into_iter().map(|s| (s.get_name().clone(), s)).collect();
+    let gene_spec_lookup = GeneSpecLookup::from_specs(genes);
 
     commands.insert_resource(EnemySpecs(enemy_specs));
-    commands.insert_resource(GeneSpecs(gene_specs));
+    commands.insert_resource(GeneSpecs(gene_spec_lookup));
 
     commands.insert_resource(NextState(Some(NucleotideState::LoadingUI)));
 }

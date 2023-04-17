@@ -11,9 +11,9 @@ use super::ui::{DisplayComponent, CharacterStatComponent};
 
 pub type TargetEntity = Entity;
 
-pub struct NucleotidePlugin;
+pub struct BattlePlugin;
 
-impl Plugin for NucleotidePlugin {
+impl Plugin for BattlePlugin {
     fn build(&self, app: &mut App) {
         app
         .insert_resource(GeneCommandQueue::default())
@@ -108,7 +108,7 @@ fn gene_loading_system(
     ) = query.get(character_acting.0).unwrap();
 
     let gene = &genome.0[genome_pointer.0];
-    let gene_spec = gene_specs.0.get(gene).expect("Gene should exist as a gene spec.");
+    let gene_spec = gene_specs.0.get_spec_from_name(gene).expect("Gene should exist as a gene spec.");
     let targets = get_targets(acting_entity, character_type_to_entity_map, gene_spec.get_target());
 
     gene_command_queue.0.append(
@@ -255,7 +255,7 @@ fn instantiate_player(mut commands: &mut Commands, genome: Vec<String>) -> Entit
 
 fn instantiate_enemy(mut commands: &mut Commands, enemy_specs: Res<EnemySpecs>, gene_specs: Res<GeneSpecs>, enemy_name: &str) -> Entity {
     let enemy_spec = enemy_specs.0.get(enemy_name).expect("Enemy spec not found");
-    let genome = enemy_spec.get_genome().iter().map(|s| gene_specs.0.get(s).expect("Gene spec not found").get_name().clone()).collect();
+    let genome = enemy_spec.get_genome().iter().map(|s| gene_specs.0.get_spec_from_name(s).expect("Gene spec not found").get_name().clone()).collect();
     commands.spawn_empty()
         .insert(EnemyComponent)
         .insert(GenomeComponent(genome))

@@ -3,9 +3,10 @@ mod game;
 use bevy::prelude::*;
 use game::assets::AssetsPlugin;
 use game::input::InputPlugin;
+use game::meta::MetaPlugin;
 use game::pause::PausePlugin;
 
-use crate::game::battle::NucleotidePlugin;
+use crate::game::battle::BattlePlugin;
 use crate::game::ui::UIPlugin;
 use crate::game::resources::*;
 
@@ -16,7 +17,8 @@ fn main() {
         .add_plugin(AssetsPlugin)
         .add_plugin(UIPlugin)
         .add_plugin(InputPlugin)
-        .add_plugin(NucleotidePlugin)
+        .add_plugin(BattlePlugin)
+        .add_plugin(MetaPlugin)
         .add_plugin(PausePlugin)
         .run();
 }

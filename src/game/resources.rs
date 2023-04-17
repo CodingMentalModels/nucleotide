@@ -3,9 +3,11 @@ use std::collections::{BTreeMap};
 use bevy::{prelude::*};
 
 use crate::game::specs::GeneCommand;
+use crate::game::constants::*;
 
 use super::specs::{EnemySpec, GeneSpec};
 
+pub type Symbol = char;
 
 #[derive(Debug, Default, Clone, Copy, PartialEq, Eq, Hash, Resource)]
 pub struct PausedState(pub NucleotideState);
@@ -39,7 +41,7 @@ pub struct GeneCommandQueue(pub Vec<(GeneCommand, Entity)>);
 pub struct EnemySpecs(pub BTreeMap<String, EnemySpec>);
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash, Resource)]
-pub struct GeneSpecs(pub BTreeMap<String, GeneSpec>);
+pub struct GeneSpecs(pub GeneSpecLookup);
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash, Resource)]
 pub struct CharacterTypeToEntity(pub Vec<(CharacterType, Entity)>);
@@ -80,4 +82,42 @@ pub enum CharacterStatType {
     Health,
     Block,
     Energy,
+}
+
+
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+pub struct GeneSpecLookup {
+    name_to_spec: BTreeMap<String, GeneSpec>,
+    symbol_to_name: BTreeMap<Symbol, String>,
+    name_to_symbol: BTreeMap<String, Symbol>,
+}
+
+impl GeneSpecLookup {
+
+    pub fn from_specs(gene_specs: Vec<GeneSpec>) -> Self {
+        let name_to_spec = gene_specs.iter().map(|spec| (spec.get_name().clone(), spec.clone())).collect();
+        let symbol_to_name: BTreeMap<Symbol, String> = gene_specs.iter().enumerate().map(|(i, spec)| (GREEK_ALPHABET[i], spec.get_name().clone())).collect();
+        let name_to_symbol = symbol_to_name.iter().map(|(s, n)| (n.clone(), *s)).collect();
+        Self {
+            name_to_spec,
+            symbol_to_name,
+            name_to_symbol,
+        }
+    }
+
+    pub fn get_spec_from_name(&self, name: &str) -> Option<&GeneSpec> {
+        self.name_to_spec.get(name)
+    }
+    
+    pub fn get_spec_from_symbol(&self, symbol: Symbol) -> Option<&GeneSpec> {
+        self.symbol_to_name.get(&symbol).and_then(|name| self.name_to_spec.get(name))
+    }
+
+    pub fn get_name_from_symbol(&self, symbol: Symbol) -> Option<&String> {
+        self.symbol_to_name.get(&symbol)
+    }
+
+    pub fn get_symbol_from_name(&self, name: &str) -> Option<Symbol> {
+        self.name_to_symbol.get(name).copied()
+    }
 }

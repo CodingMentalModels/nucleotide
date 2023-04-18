@@ -64,13 +64,12 @@ fn initialize_battle_system(
     mut enemy_queue: ResMut<EnemyQueue>,
 ) {
 
-    let player_genome = vec!["Sting".to_string(), "Block".to_string()];
     let player_entity = instantiate_player(&mut commands, player);
     let enemy_entity = instantiate_enemy(
         &mut commands,
         enemy_queue.pop().expect("There should always be more enemies!"),
-        gene_specs.0,
-        enemy_specs
+        gene_specs,
+        enemy_specs,
     );
 
     commands.insert_resource(CharacterActing(player_entity));
@@ -266,9 +265,9 @@ fn instantiate_player(mut commands: &mut Commands, player: Res<Player>) -> Entit
         .id()
 }
 
-fn instantiate_enemy(mut commands: &mut Commands, enemy_name: EnemyName, gene_lookup: GeneSpecLookup, enemy_specs: Res<EnemySpecs>) -> Entity {
+fn instantiate_enemy(commands: &mut Commands, enemy_name: EnemyName, gene_specs: Res<GeneSpecs>, enemy_specs: Res<EnemySpecs>) -> Entity {
     let enemy_spec = enemy_specs.get(enemy_name);
-    let genome = enemy_spec.get_genome().iter().map(|s| gene_lookup.get_spec_from_name(s).expect("Gene spec not found").get_name().clone()).collect();
+    let genome = enemy_spec.get_genome().iter().map(|s| gene_specs.0.get_spec_from_name(s).expect("Gene spec not found").get_name().clone()).collect();
     commands.spawn_empty()
         .insert(EnemyComponent)
         .insert(GenomeComponent(genome))

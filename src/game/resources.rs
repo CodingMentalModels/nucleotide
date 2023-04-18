@@ -19,7 +19,7 @@ pub enum NucleotideState {
     LoadingUI,
     Menu,
     Paused,
-    InstantiateMeta,
+    InstantiatingMeta,
     Drafting,
     InitializingBattle,
     CharacterActing,

@@ -9,7 +9,7 @@ pub struct MetaPlugin;
 impl Plugin for MetaPlugin {
     fn build(&self, app: &mut App) {
         app.add_systems((
-            instantiate_meta_system.in_schedule(OnEnter(NucleotideState::InstantiateMeta)),
+            instantiate_meta_system.in_schedule(OnEnter(NucleotideState::InstantiatingMeta)),
         ));
     }
 }
@@ -23,7 +23,6 @@ impl Plugin for MetaPlugin {
 
 fn instantiate_meta_system(
     mut commands: Commands,
-    gene_specs: Res<GeneSpecs>,
     enemy_specs: Res<EnemySpecs>,
 ) {
 
@@ -39,6 +38,8 @@ fn instantiate_meta_system(
 
     commands.insert_resource(player);
     commands.insert_resource(enemy_queue);
+
+    commands.insert_resource(NextState(Some(NucleotideState::InitializingBattle)));
 }
 
 // End Systems

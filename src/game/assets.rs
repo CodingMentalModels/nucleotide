@@ -59,8 +59,15 @@ fn load_assets_system(mut commands: Commands) {
         .map(|s| serde_json::from_str(&s))
         .collect::<Result<Vec<GeneSpec>, _>>().expect("Error parsing gene specs");
 
-    let enemy_specs = enemies.into_iter().map(|s| (s.get_name().clone(), s)).collect();
-    let gene_spec_lookup = GeneSpecLookup::from_specs(genes);
+    let enemy_specs = enemies.into_iter()
+        .map(|s| (s.get_name().clone(), s))
+        .filter(|(name, _spec)| !name.to_lowercase().contains("Example"))
+        .collect();
+    let gene_spec_lookup = GeneSpecLookup::from_specs(
+        genes.into_iter()
+        .filter(|s| !s.get_name().to_lowercase().contains("Example"))
+        .collect()
+    );
 
     commands.insert_resource(EnemySpecs(enemy_specs));
     commands.insert_resource(GeneSpecs(gene_spec_lookup));

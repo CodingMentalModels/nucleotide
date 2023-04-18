@@ -171,7 +171,7 @@ fn ui_load_system(
                             JustifyContent::FlexStart,
                         )
                     ).insert(DisplayComponent::new("Genes".to_string(), "XXXX".to_string()))
-                    .insert(GeneDisplayComponent::new(CharacterType::Player, player_genes));
+                    .insert(GeneDisplayComponent::new(CharacterType::Player, vec![]));
                     parent.spawn(
                         get_text_bundle(
                             "Energy: 0",
@@ -255,7 +255,7 @@ fn ui_load_system(
         }
     );
 
-    commands.insert_resource(NextState(Some(NucleotideState::InitializingBattle)));
+    commands.insert_resource(NextState(Some(NucleotideState::InstantiatingMeta)));
 
 }
 

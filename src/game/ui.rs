@@ -242,6 +242,14 @@ fn ui_load_system(
                     );
                     parent.spawn(
                         get_text_bundle(
+                            "Genes: ",
+                            get_text_style(font.clone(), Color::WHITE),
+                            JustifyContent::FlexStart,
+                        )
+                    ).insert(DisplayComponent::new("Genes".to_string(), "XXXX".to_string()))
+                    .insert(GenomeDisplayComponent::new(CharacterType::Enemy, vec![]));
+                    parent.spawn(
+                        get_text_bundle(
                             "Energy: 0",
                             get_text_style(font.clone(), Color::WHITE),
                             JustifyContent::FlexStart,

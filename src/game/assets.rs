@@ -61,11 +61,11 @@ fn load_assets_system(mut commands: Commands) {
 
     let enemy_specs = enemies.into_iter()
         .map(|s| (s.get_name().clone(), s))
-        .filter(|(name, _spec)| !name.to_lowercase().contains("Example"))
+        .filter(|(name, _spec)| !name.to_lowercase().contains("example"))
         .collect();
     let gene_spec_lookup = GeneSpecLookup::from_specs(
         genes.into_iter()
-        .filter(|s| !s.get_name().to_lowercase().contains("Example"))
+        .filter(|s| !s.get_name().to_lowercase().contains("example"))
         .collect()
     );
 

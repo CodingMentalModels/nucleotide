@@ -15,6 +15,7 @@ impl Plugin for UIPlugin {
                 ui_load_system.in_schedule(OnEnter(NucleotideState::LoadingUI)),
                 render_system.run_if(in_state(NucleotideState::GeneAnimating)),
                 display_state_system,
+                display_genome_system,
                 paused_ui_system.run_if(in_state(NucleotideState::Paused))
             ));
     }
@@ -50,13 +51,13 @@ pub struct CharacterStatComponent(pub CharacterType, pub CharacterStatType);
 
 
 #[derive(Component, Clone)]
-pub struct GeneDisplayComponent {
+pub struct GenomeDisplayComponent {
     character_type: CharacterType,
     genes: Vec<Symbol>,
     active_gene: Option<Symbol>,
 }
 
-impl GeneDisplayComponent {
+impl GenomeDisplayComponent {
 
     pub fn new(character_type: CharacterType, genes: Vec<Symbol>) -> Self {
         Self {
@@ -74,9 +75,22 @@ impl GeneDisplayComponent {
         &self.genes
     }
 
+    pub fn set_genes(&mut self, genes: Vec<Symbol>) {
+        self.genes = genes;
+    }
+
     pub fn get_active_gene(&self) -> Option<Symbol> {
         self.active_gene
     }
+
+    pub fn set_active_gene(&mut self, symbol: Symbol) {
+        self.active_gene = Some(symbol);
+    }
+
+    pub fn clear_active_gene(&mut self) {
+        self.active_gene = None;
+    }
+
 }
 
 // End Components
@@ -171,7 +185,7 @@ fn ui_load_system(
                             JustifyContent::FlexStart,
                         )
                     ).insert(DisplayComponent::new("Genes".to_string(), "XXXX".to_string()))
-                    .insert(GeneDisplayComponent::new(CharacterType::Player, vec![]));
+                    .insert(GenomeDisplayComponent::new(CharacterType::Player, vec![]));
                     parent.spawn(
                         get_text_bundle(
                             "Energy: 0",
@@ -297,6 +311,20 @@ fn display_state_system(
                 }
             }
         }
+    }
+}
+
+fn display_genome_system(
+    mut query: Query<(&GenomeDisplayComponent, &mut Text)>,
+) {
+    for (display, mut text) in &mut query {
+        text.sections[0].value = display.genes.iter().map(|gene| 
+            if display.active_gene == Some(*gene) {
+                format!("|{}|", gene)
+            } else {
+                format!(" {} ", gene.to_string())
+            }
+        ).collect::<Vec<String>>().join("");
     }
 }
 

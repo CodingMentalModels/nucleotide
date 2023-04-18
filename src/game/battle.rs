@@ -7,8 +7,8 @@ use crate::game::constants::*;
 use crate::game::input::PauseUnpauseEvent;
 
 use super::specs::EnemyName;
-use super::specs::EnemySpec;
 use super::specs::{GeneCommand, TargetType};
+use super::ui::GenomeDisplayComponent;
 use super::ui::{DisplayComponent, CharacterStatComponent};
 
 pub type TargetEntity = Entity;
@@ -29,6 +29,7 @@ impl Plugin for BattlePlugin {
             update_health_system.in_schedule(OnEnter(NucleotideState::GeneEventHandling)),
             finished_handling_gene_system.run_if(in_state(NucleotideState::GeneEventHandling)),
             render_character_display_system.in_schedule(OnEnter(NucleotideState::GeneAnimating)),
+            render_genome_system.in_schedule(OnEnter(NucleotideState::GeneAnimating)),
             finished_animating_gene_system.run_if(in_state(NucleotideState::GeneAnimating)),
         ));
     }
@@ -203,6 +204,32 @@ fn render_character_display_system(
     }
 }
 
+fn render_genome_system(
+    character_query: Query<(Entity, &GenomeComponent, &GenomePointerComponent)>,
+    mut genome_display_query: Query<(&mut GenomeDisplayComponent)>,
+    gene_specs: Res<GeneSpecs>,
+    character_type_to_entity_map: Res<CharacterTypeToEntity>,
+) {
+    
+    for (entity, genome, genome_pointer) in character_query.iter() {
+        for mut genome_display in genome_display_query.iter_mut() {
+            if entity == character_type_to_entity_map.get(genome_display.get_character_type()) {
+                genome_display.set_genes(
+                    genome.0.iter()
+                        .map(|gene| gene_specs.0.get_symbol_from_name(gene).expect("All genes should have valid symbols."))
+                        .collect()
+                );
+                genome_display.set_active_gene(
+                    gene_specs.0.get_symbol_from_name(
+                        genome.0.get(genome_pointer.0).expect("Genome pointer should always be valid")
+                    ).expect("All genes should have valid symbols.")
+                );
+            }
+        }
+    }
+
+}
+
 fn finished_animating_gene_system(
     mut commands: Commands,
 ) {
@@ -267,7 +294,7 @@ fn instantiate_player(mut commands: &mut Commands, player: Res<Player>) -> Entit
 
 fn instantiate_enemy(commands: &mut Commands, enemy_name: EnemyName, gene_specs: Res<GeneSpecs>, enemy_specs: Res<EnemySpecs>) -> Entity {
     let enemy_spec = enemy_specs.get(enemy_name);
-    let genome = enemy_spec.get_genome().iter().map(|s| gene_specs.0.get_spec_from_name(s).expect("Gene spec not found").get_name().clone()).collect();
+    let genome = enemy_spec.get_genome().iter().map(|s| gene_specs.0.get_spec_from_name(s).expect(&format!("Gene spec not found: {}", s)).get_name().clone()).collect();
     commands.spawn_empty()
         .insert(EnemyComponent)
         .insert(GenomeComponent(genome))

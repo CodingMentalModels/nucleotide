@@ -104,6 +104,7 @@ State Machine that controls Game Phases:
     - Status(StatusEffect, u8)
     - JumpForwardNGenes(u8)
     - ReverseGeneProcessing
+    - RepeatGeneNTimes(u8)
     - GainEnergy(u8)
 
 
@@ -113,10 +114,10 @@ State Machine that controls Game Phases:
 [x] Bevy functional
 [x] IyesLoopless functional
 [x] Fonts loaded and displaying on screen
-[ ] Data driven approach for specifying genes and enemies sketched out
+[x] Data driven approach for specifying genes and enemies sketched out
 
 ### V1
-[ ] Basic versions of systems implemented for Battle and Components
+[x] Basic versions of systems implemented for Battle and Components
 [ ] Models loaded and displaying on screen
 [ ] 10 basic genes and 3 basic enemies
 

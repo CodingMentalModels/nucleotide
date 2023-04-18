@@ -123,31 +123,21 @@ fn ui_load_system(
             style: Style {
                 size: Size::new(Val::Percent(100.0), Val::Percent(100.0)),
                 position_type: PositionType::Absolute,
-                justify_content: JustifyContent::SpaceBetween,
-                align_items: AlignItems::FlexEnd,
+                justify_content: JustifyContent::FlexStart,
+                align_items: AlignItems::FlexStart,
                 ..Default::default()
             }, background_color: Color::NONE.into(),
             ..Default::default()
         }
     ).with_children(
         |parent| {
-            let mut text = ALPHA_LOWER.to_string();
-            text.push(BETA_UPPER);
-            text.push(GAMMA_UPPER);
-            parent.spawn(
-                get_text_bundle(
-                    &text,
-                    get_text_style(font.clone(), Color::WHITE),
-                    JustifyContent::Center,
-                )
-            );
             
             // State
             parent.spawn(
                 get_text_bundle(
-                    &text,
+                    "State: Uninitialized",
                     get_text_style(font.clone(), Color::WHITE),
-                    JustifyContent::Center,
+                    JustifyContent::FlexStart,
                 )
             ).insert(DisplayComponent::new("State".to_string(), "Uninitialized".to_string()));
 

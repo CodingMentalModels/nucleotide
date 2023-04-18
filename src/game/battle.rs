@@ -110,18 +110,19 @@ fn gene_loading_system(
     character_type_to_entity_map: Res<CharacterTypeToEntity>,
     mut gene_command_queue: ResMut<GeneCommandQueue>,
     gene_specs: Res<GeneSpecs>,
-    query: Query<(Entity, &GenomeComponent, &GenomePointerComponent)>,
+    mut query: Query<(Entity, &mut GenomeComponent)>,
     mut pause_unpause_event_writer: EventWriter<PauseUnpauseEvent>,
 ) {
 
     let (
         acting_entity,
-        genome,
-        genome_pointer
-    ) = query.get(character_acting.0).unwrap();
+        mut genome,
+    ) = query.get_mut(character_acting.0).unwrap();
 
-    let gene = &genome.0[genome_pointer.0];
-    let gene_spec = gene_specs.0.get_spec_from_name(gene).expect("Gene should exist as a gene spec.");
+    let gene = genome.get_active_gene();
+    genome.advance_pointer();
+
+    let gene_spec = gene_specs.0.get_spec_from_name(&gene).expect("Gene should exist as a gene spec.");
     let targets = get_targets(acting_entity, character_type_to_entity_map, gene_spec.get_target());
 
     gene_command_queue.0.append(
@@ -205,23 +206,23 @@ fn render_character_display_system(
 }
 
 fn render_genome_system(
-    character_query: Query<(Entity, &GenomeComponent, &GenomePointerComponent)>,
+    character_query: Query<(Entity, &GenomeComponent)>,
     mut genome_display_query: Query<(&mut GenomeDisplayComponent)>,
     gene_specs: Res<GeneSpecs>,
     character_type_to_entity_map: Res<CharacterTypeToEntity>,
 ) {
     
-    for (entity, genome, genome_pointer) in character_query.iter() {
+    for (entity, genome) in character_query.iter() {
         for mut genome_display in genome_display_query.iter_mut() {
             if entity == character_type_to_entity_map.get(genome_display.get_character_type()) {
                 genome_display.set_genes(
-                    genome.0.iter()
+                    genome.get_genes().iter()
                         .map(|gene| gene_specs.0.get_symbol_from_name(gene).expect("All genes should have valid symbols."))
                         .collect()
                 );
                 genome_display.set_active_gene(
                     gene_specs.0.get_symbol_from_name(
-                        genome.0.get(genome_pointer.0).expect("Genome pointer should always be valid")
+                        &genome.get_active_gene()
                     ).expect("All genes should have valid symbols.")
                 );
             }
@@ -247,11 +248,37 @@ pub struct PlayerComponent;
 pub struct EnemyComponent;
 
 #[derive(Component, Clone)]
-pub struct GenomeComponent(pub Vec<String>);
+pub struct GenomeComponent {
+    pub genes: Vec<String>,
+    pub pointer: usize
+}
 
+impl GenomeComponent {
 
-#[derive(Component, Clone, Copy)]
-pub struct GenomePointerComponent(usize);
+    pub fn new(genes: Vec<String>, pointer: usize) -> Self {
+        GenomeComponent {
+            genes,
+            pointer
+        }
+    }
+
+    pub fn instantiate(genes: Vec<String>) -> Self {
+        Self::new(genes, 0)
+    }
+
+    pub fn get_genes(&self) -> Vec<String> {
+        self.genes.clone()
+    }
+
+    pub fn get_active_gene(&self) -> String {
+        self.genes.get(self.pointer).expect("Genome pointer should always be valid").clone()
+    }
+
+    pub fn advance_pointer(&mut self) {
+        self.pointer = (self.pointer + 1) % self.genes.len();
+    }
+}
+
 
 #[derive(Component, Clone, Copy)]
 pub struct EnergyComponent {
@@ -284,8 +311,7 @@ pub struct BlockComponent(pub u8);
 fn instantiate_player(mut commands: &mut Commands, player: Res<Player>) -> Entity {
     commands.spawn_empty()
         .insert(PlayerComponent)
-        .insert(GenomeComponent(player.get_genome()))
-        .insert(GenomePointerComponent(0))
+        .insert(GenomeComponent::instantiate(player.get_genome()))
         .insert(HealthComponent(player.get_health()))
         .insert(BlockComponent(0))
         .insert(EnergyComponent::new(player.get_energy(), player.get_energy()))
@@ -297,8 +323,7 @@ fn instantiate_enemy(commands: &mut Commands, enemy_name: EnemyName, gene_specs:
     let genome = enemy_spec.get_genome().iter().map(|s| gene_specs.0.get_spec_from_name(s).expect(&format!("Gene spec not found: {}", s)).get_name().clone()).collect();
     commands.spawn_empty()
         .insert(EnemyComponent)
-        .insert(GenomeComponent(genome))
-        .insert(GenomePointerComponent(0))
+        .insert(GenomeComponent::instantiate(genome))
         .insert(HealthComponent(enemy_spec.get_health()))
         .insert(BlockComponent(0))
         .insert(EnergyComponent::new(enemy_spec.get_energy(), enemy_spec.get_energy()))

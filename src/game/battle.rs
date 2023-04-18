@@ -26,7 +26,8 @@ impl Plugin for BattlePlugin {
             character_acting_system.in_schedule(OnEnter(NucleotideState::CharacterActing)),
             gene_loading_system.in_schedule(OnEnter(NucleotideState::GeneLoading)),
             handle_gene_commands_system.in_schedule(OnEnter(NucleotideState::GeneCommandHandling)),
-            update_health_system.in_schedule(OnEnter(NucleotideState::GeneEventHandling)),
+            update_health_system.in_schedule(OnEnter(NucleotideState::GeneCommandHandling)).after(handle_gene_commands_system),
+            update_block_system.in_schedule(OnEnter(NucleotideState::GeneCommandHandling)).after(handle_gene_commands_system),
             finished_handling_gene_system.run_if(in_state(NucleotideState::GeneEventHandling)),
             render_character_display_system.in_schedule(OnEnter(NucleotideState::GeneAnimating)),
             render_genome_system.in_schedule(OnEnter(NucleotideState::GeneAnimating)),
@@ -84,6 +85,7 @@ fn character_acting_system(
     mut character_acting: ResMut<CharacterActing>,
     character_type_to_entity_map: Res<CharacterTypeToEntity>,
     mut query: Query<(Entity, &mut EnergyComponent)>,
+    mut remove_statuses_query: Query<(Entity, &mut BlockComponent)>,
     mut pause_unpause_event_writer: EventWriter<PauseUnpauseEvent>,
 ) {
 
@@ -95,6 +97,10 @@ fn character_acting_system(
     if energy.energy_remaining == 0 {
         energy.energy_remaining = energy.starting_energy;
         character_acting.0 = character_type_to_entity_map.get_next(acting_entity);
+
+        remove_statuses_query.iter_mut()
+            .filter(|(entity, _block)| entity == &character_acting.0)
+            .for_each(|(_entity, mut block)| block.0 = 0);
     } else {
         energy.energy_remaining -= 1;
     }
@@ -162,22 +168,30 @@ fn handle_gene_commands_system(
 }
 
 fn update_health_system(
-    mut query: Query<(Entity, &mut HealthComponent)>,
+    mut query: Query<(Entity, &mut HealthComponent, &mut BlockComponent)>,
     mut damage_event_reader: EventReader<DamageEvent>,
-    mut block_event_reader: EventReader<BlockEvent>,
 ) {
 
-
-    for (entity, mut health) in query.iter_mut() {
-        let total_damage = damage_event_reader.iter().filter(|damage_event| damage_event.0 == entity).map(|damage_event| damage_event.1).sum::<u8>();
-        let total_block = block_event_reader.iter().filter(|block_event| block_event.0 == entity).map(|block_event| block_event.1).sum::<u8>();
-
-        let final_damage = total_damage.saturating_sub(total_block);
-        let final_health = health.0.saturating_sub(final_damage);
-
-        health.0 = final_health;
-
+    for damage_event in damage_event_reader.iter() {
+        if let Ok((_, mut health, mut block)) = query.get_mut(damage_event.0) {
+            let damage = damage_event.1.saturating_sub(block.0);
+            block.0 = block.0.saturating_sub(damage_event.1);
+            health.0 = health.0.saturating_sub(damage);
+        }
     }
+
+}
+
+fn update_block_system(
+    mut query: Query<(Entity, &mut BlockComponent)>,
+    mut block_event_reader: EventReader<BlockEvent>,
+) {
+    for block_event in block_event_reader.iter() {
+        if let Ok((_, mut block)) = query.get_mut(block_event.0) {
+            block.0 = block.0.saturating_add(block_event.1);
+        }
+    }
+
 }
 
 fn finished_handling_gene_system(

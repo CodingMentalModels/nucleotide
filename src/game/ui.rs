@@ -17,6 +17,7 @@ impl Plugin for UIPlugin {
                 render_system.run_if(in_state(NucleotideState::GeneAnimating)),
                 display_state_system,
                 display_genome_system,
+                hover_over_gene_system.after(display_genome_system),
                 paused_ui_system.run_if(in_state(NucleotideState::Paused))
             ));
     }

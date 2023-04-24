@@ -405,7 +405,7 @@ fn initialize_gene_container(parent: &mut ChildBuilder, font: Handle<Font>, char
                 justify_content: JustifyContent::FlexStart,
                 align_items: AlignItems::FlexStart,
                 ..Default::default()
-            }, background_color: Color::BLACK.into(),
+            },
             ..Default::default()
         }
     ).with_children(
@@ -416,9 +416,9 @@ fn initialize_gene_container(parent: &mut ChildBuilder, font: Handle<Font>, char
                         &GREEK_ALPHABET[i].to_string(),
                         get_text_style(font.clone(), Color::WHITE, 20.0),
                         JustifyContent::FlexStart,
-                        1.0,
+                        5.0,
                     )
-                ).insert(GenomeDisplayComponent::new(character_type, Some((GREEK_ALPHABET[i], false)), i));
+                ).insert(GenomeDisplayComponent::new(character_type, None, i));
             }
         }
     );

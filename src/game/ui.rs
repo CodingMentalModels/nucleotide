@@ -1,3 +1,4 @@
+use bevy::window::{PrimaryWindow, Cursor};
 use bevy::{prelude::*, asset::LoadState};
 use bevy_egui::{egui, EguiContexts, EguiPlugin};
 
@@ -341,6 +342,48 @@ fn display_genome_system(
     }
 }
 
+fn hover_over_gene_system(
+    mut commands: Commands,
+    mut query: Query<(Entity, &mut GenomeDisplayComponent, &Node, &GlobalTransform)>,
+    window_query: Query<(&Window), With<PrimaryWindow>>,
+    gene_specs: Res<GeneSpecs>,
+) {
+
+    let window = window_query.single();
+
+    for (gene_entity, mut display, node, transform) in &mut query {
+        commands.entity(gene_entity).despawn_descendants();
+        match window.cursor_position() {
+            Some(mouse_position) => {
+                let node_position = transform.translation();
+                let node_size = node.size();
+                let node_rect = Rect::new(
+                    node_position.x,
+                    node_position.y,
+                    node_position.x + node_size.x,
+                    node_position.y + node_size.y,
+                );
+
+                if node_rect.contains(mouse_position) {
+                    commands.entity(gene_entity).with_children(
+                        |parent| {
+                            render_gene_card(
+                                parent,
+                                display.get_gene_symbol().unwrap_or(' ').to_string(),
+                                font.clone(),
+                            );
+                        }
+                    );
+                }
+            }
+            None => {}
+        }
+    }
+
+
+
+}
+
 fn paused_ui_system(
     mut egui_ctx: EguiContexts,
 ) {
@@ -424,4 +467,18 @@ fn initialize_gene_container(parent: &mut ChildBuilder, font: Handle<Font>, char
     );
 }
 
+fn render_gene_card(
+    parent: &mut ChildBuilder,
+    display: String,
+    font: Handle<Font>,
+) {
+    parent.spawn(
+        get_text_bundle(
+            &display.to_string(),
+            get_text_style(font.clone(), Color::WHITE, 20.0),
+            JustifyContent::FlexStart,
+            5.0,
+        )
+    );
+}
 // End Helper Functions

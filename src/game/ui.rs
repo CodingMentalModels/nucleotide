@@ -53,17 +53,17 @@ pub struct CharacterStatComponent(pub CharacterType, pub CharacterStatType);
 #[derive(Component, Clone)]
 pub struct GenomeDisplayComponent {
     character_type: CharacterType,
-    genes: Vec<Symbol>,
-    active_gene: Option<Symbol>,
+    gene: Option<(Symbol, bool)>,
+    index: usize,
 }
 
 impl GenomeDisplayComponent {
 
-    pub fn new(character_type: CharacterType, genes: Vec<Symbol>) -> Self {
+    pub fn new(character_type: CharacterType, gene: Option<(Symbol, bool)>, index: usize) -> Self {
         Self {
             character_type,
-            genes,
-            active_gene: None,
+            gene,
+            index,
         }
     }
 
@@ -71,24 +71,49 @@ impl GenomeDisplayComponent {
         self.character_type
     }
 
-    pub fn get_genes(&self) -> &Vec<Symbol> {
-        &self.genes
+    pub fn get_gene_symbol(&self) -> Option<Symbol> {
+        self.gene.map(|(symbol, _)| symbol)
     }
 
-    pub fn set_genes(&mut self, genes: Vec<Symbol>) {
-        self.genes = genes;
+    pub fn set_gene_symbol(&mut self, gene: Symbol) {
+        self.gene = Some((gene, false));
     }
 
-    pub fn get_active_gene(&self) -> Option<Symbol> {
-        self.active_gene
+    pub fn maybe_set_gene_symbol(&mut self, maybe_gene_symbol: Option<Symbol>) {
+        match maybe_gene_symbol {
+            Some(gene) => self.set_gene_symbol(gene),
+            None => self.clear(),
+        }
     }
 
-    pub fn set_active_gene(&mut self, symbol: Symbol) {
-        self.active_gene = Some(symbol);
+    pub fn get_index(&self) -> usize {
+        self.index
     }
 
-    pub fn clear_active_gene(&mut self) {
-        self.active_gene = None;
+    pub fn is_active(&self) -> bool {
+        match self.gene {
+            Some((_, is_active)) => is_active,
+            None => false,
+        }
+    }
+
+    pub fn set_active(&mut self) {
+        match self.gene {
+            Some((symbol, _)) => self.gene = Some((symbol, true)),
+            None => (),
+        }
+    }
+
+    pub fn clear_active(&mut self) {
+        match self.gene {
+            Some((symbol, _)) => self.gene = Some((symbol, false)),
+            None => (),
+        }
+    }
+
+    pub fn clear(&mut self) {
+        self.gene = None;
+        self.clear_active();
     }
 
 }
@@ -136,8 +161,9 @@ fn ui_load_system(
             parent.spawn(
                 get_text_bundle(
                     "State: Uninitialized",
-                    get_text_style(font.clone(), Color::WHITE),
+                    get_text_style(font.clone(), Color::WHITE, 20.0),
                     JustifyContent::FlexStart,
+                    5.0,
                 )
             ).insert(DisplayComponent::new("State".to_string(), "Uninitialized".to_string()));
 
@@ -164,40 +190,37 @@ fn ui_load_system(
                     parent.spawn(
                         get_text_bundle(
                             "Player",
-                            get_text_style(font.clone(), Color::WHITE),
+                            get_text_style(font.clone(), Color::WHITE, 20.0),
                             JustifyContent::FlexStart,
+                            5.0,
                         )
                     );
-                    parent.spawn(
-                        get_text_bundle(
-                            "Genes: ",
-                            get_text_style(font.clone(), Color::WHITE),
-                            JustifyContent::FlexStart,
-                        )
-                    ).insert(DisplayComponent::new("Genes".to_string(), "XXXX".to_string()))
-                    .insert(GenomeDisplayComponent::new(CharacterType::Player, vec![]));
+                    initialize_gene_container(parent, font.clone(), CharacterType::Player);
                     parent.spawn(
                         get_text_bundle(
                             "Energy: 0",
-                            get_text_style(font.clone(), Color::WHITE),
+                            get_text_style(font.clone(), Color::WHITE, 20.0),
                             JustifyContent::FlexStart,
+                            5.0,
                         )
                     ).insert(DisplayComponent::new_with_u8_value("Energy".to_string(), u8::MAX))
                     .insert(CharacterStatComponent(CharacterType::Player, CharacterStatType::Energy));
                     parent.spawn(
                         get_text_bundle(
                             "Health: 999999",
-                            get_text_style(font.clone(), Color::WHITE),
+                            get_text_style(font.clone(), Color::WHITE, 20.0),
                             JustifyContent::FlexStart,
+                            5.0,
                         )
                     ).insert(DisplayComponent::new_with_u8_value("Health".to_string(), u8::MAX))
                     .insert(CharacterStatComponent(CharacterType::Player, CharacterStatType::Health));
                     parent.spawn(
                         get_text_bundle(
                             "Block: 0",
-                            get_text_style(font.clone(), Color::WHITE),
+                            get_text_style(font.clone(), Color::WHITE, 20.0),
                             JustifyContent::FlexStart,
-                        )
+                            5.0,
+                    )
                     ).insert(DisplayComponent::new_with_u8_value("Block".to_string(), u8::MAX))
                     .insert(CharacterStatComponent(CharacterType::Player, CharacterStatType::Block));
                 }
@@ -226,39 +249,36 @@ fn ui_load_system(
                     parent.spawn(
                         get_text_bundle(
                             "Enemy",
-                            get_text_style(font.clone(), Color::WHITE),
+                            get_text_style(font.clone(), Color::WHITE, 20.0),
                             JustifyContent::FlexStart,
+                            5.0,
                         )
                     );
-                    parent.spawn(
-                        get_text_bundle(
-                            "Genes: ",
-                            get_text_style(font.clone(), Color::WHITE),
-                            JustifyContent::FlexStart,
-                        )
-                    ).insert(DisplayComponent::new("Genes".to_string(), "XXXX".to_string()))
-                    .insert(GenomeDisplayComponent::new(CharacterType::Enemy, vec![]));
+                    initialize_gene_container(parent, font.clone(), CharacterType::Enemy);
                     parent.spawn(
                         get_text_bundle(
                             "Energy: 0",
-                            get_text_style(font.clone(), Color::WHITE),
+                            get_text_style(font.clone(), Color::WHITE, 20.0),
                             JustifyContent::FlexStart,
+                            5.0,
                         )
                     ).insert(DisplayComponent::new_with_u8_value("Energy".to_string(), u8::MAX))
                     .insert(CharacterStatComponent(CharacterType::Enemy, CharacterStatType::Energy));
                     parent.spawn(
                         get_text_bundle(
                             "Health: 999999",
-                            get_text_style(font.clone(), Color::WHITE),
+                            get_text_style(font.clone(), Color::WHITE, 20.0),
                             JustifyContent::FlexStart,
+                            5.0,
                         )
                     ).insert(DisplayComponent::new_with_u8_value("Health".to_string(), u8::MAX))
                     .insert(CharacterStatComponent(CharacterType::Enemy, CharacterStatType::Health));
                     parent.spawn(
                         get_text_bundle(
                             "Block: 0",
-                            get_text_style(font.clone(), Color::WHITE),
+                            get_text_style(font.clone(), Color::WHITE, 20.0),
                             JustifyContent::FlexStart,
+                            5.0,
                         )
                     ).insert(DisplayComponent::new_with_u8_value("Block".to_string(), u8::MAX))
                     .insert(CharacterStatComponent(CharacterType::Enemy, CharacterStatType::Block));
@@ -316,13 +336,8 @@ fn display_genome_system(
     mut query: Query<(&GenomeDisplayComponent, &mut Text)>,
 ) {
     for (display, mut text) in &mut query {
-        text.sections[0].value = display.genes.iter().map(|gene| 
-            if display.active_gene == Some(*gene) {
-                format!("|{}|", gene)
-            } else {
-                format!(" {} ", gene.to_string())
-            }
-        ).collect::<Vec<String>>().join("");
+        text.sections[0].value = display.get_gene_symbol().unwrap_or(' ').to_string();
+        text.sections[0].style.color = if display.is_active() { Color::YELLOW_GREEN } else { Color::WHITE };
     }
 }
 
@@ -357,6 +372,7 @@ fn get_text_bundle(
     text: &str,
     text_style: TextStyle,
     justify_content: JustifyContent,
+    margin_width: f32,
 ) -> TextBundle {
     TextBundle::from_section(
         text.to_string(),
@@ -366,18 +382,46 @@ fn get_text_bundle(
         Style {
             align_self: AlignSelf::FlexStart,
             justify_content: justify_content,
-            margin: UiRect::all(Val::Px(5.0)),
+            margin: UiRect::all(Val::Px(margin_width)),
             ..Default::default()
         }
     )
 }
 
-fn get_text_style(font: Handle<Font>, color: Color) -> TextStyle {
+fn get_text_style(font: Handle<Font>, color: Color, font_size: f32) -> TextStyle {
     TextStyle {
         font: font,
-        font_size: 20.0,
+        font_size,
         color: color,
     }
+}
+
+fn initialize_gene_container(parent: &mut ChildBuilder, font: Handle<Font>, character_type: CharacterType) {
+    parent.spawn(
+        NodeBundle {
+            style: Style {
+                position_type: PositionType::Relative,
+                flex_direction: FlexDirection::Row,
+                justify_content: JustifyContent::FlexStart,
+                align_items: AlignItems::FlexStart,
+                ..Default::default()
+            }, background_color: Color::BLACK.into(),
+            ..Default::default()
+        }
+    ).with_children(
+        |gene_container| {
+            for i in 0..GREEK_ALPHABET.len() {
+                gene_container.spawn(
+                    get_text_bundle(
+                        &GREEK_ALPHABET[i].to_string(),
+                        get_text_style(font.clone(), Color::WHITE, 20.0),
+                        JustifyContent::FlexStart,
+                        1.0,
+                    )
+                ).insert(GenomeDisplayComponent::new(character_type, Some((GREEK_ALPHABET[i], false)), i));
+            }
+        }
+    );
 }
 
 // End Helper Functions

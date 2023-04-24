@@ -229,16 +229,18 @@ fn render_genome_system(
     for (entity, genome) in character_query.iter() {
         for mut genome_display in genome_display_query.iter_mut() {
             if entity == character_type_to_entity_map.get(genome_display.get_character_type()) {
-                genome_display.set_genes(
-                    genome.get_genes().iter()
-                        .map(|gene| gene_specs.0.get_symbol_from_name(gene).expect("All genes should have valid symbols."))
-                        .collect()
-                );
-                genome_display.set_active_gene(
-                    gene_specs.0.get_symbol_from_name(
-                        &genome.get_active_gene()
-                    ).expect("All genes should have valid symbols.")
-                );
+                let gene_symbol = genome.get_gene(genome_display.get_index()).map( |gene_name| {
+                    gene_specs.0.get_symbol_from_name(&gene_name).expect("All genes should have valid symbols.")
+                });
+                genome_display.maybe_set_gene_symbol(gene_symbol);
+
+                let active_gene_symbol = gene_specs.0.get_symbol_from_name(&genome.get_active_gene())
+                    .expect("All genes should have valid symbols.");
+                if genome_display.get_gene_symbol() == Some(active_gene_symbol) {
+                    genome_display.set_active();
+                } else {
+                    genome_display.clear_active();
+                }
             }
         }
     }
@@ -282,6 +284,10 @@ impl GenomeComponent {
 
     pub fn get_genes(&self) -> Vec<String> {
         self.genes.clone()
+    }
+
+    pub fn get_gene(&self, index: usize) -> Option<String> {
+        self.genes.get(index).cloned()
     }
 
     pub fn get_active_gene(&self) -> String {

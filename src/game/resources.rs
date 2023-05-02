@@ -182,3 +182,7 @@ impl GeneSpecLookup {
         self.name_to_symbol.get(name).copied()
     }
 }
+
+
+#[derive(Debug, Clone, PartialEq, Eq, Hash, Resource)]
+pub struct LoadedFont(pub Handle<Font>);

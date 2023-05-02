@@ -1,3 +1,4 @@
+use bevy::ui::RelativeCursorPosition;
 use bevy::window::{PrimaryWindow, Cursor};
 use bevy::{prelude::*, asset::LoadState};
 use bevy_egui::{egui, EguiContexts, EguiPlugin};
@@ -142,6 +143,9 @@ fn ui_load_system(
     if asset_server.get_load_state(font.clone()) == LoadState::Failed {
         panic!("Failed to load font: {:?}", asset_server.get_load_state(font.clone()));
     }
+
+    commands.insert_resource(LoadedFont(font.clone()));
+
 
     commands.spawn(Camera2dBundle::default());
 
@@ -345,39 +349,31 @@ fn display_genome_system(
 
 fn hover_over_gene_system(
     mut commands: Commands,
-    mut query: Query<(Entity, &mut GenomeDisplayComponent, &Node, &GlobalTransform)>,
-    window_query: Query<(&Window), With<PrimaryWindow>>,
+    mut query: Query<(Entity, &GenomeDisplayComponent, &RelativeCursorPosition)>,
+    window_query: Query<&Window>,
+    camera_query: Query<(&Camera, &GlobalTransform)>,
     gene_specs: Res<GeneSpecs>,
+    loaded_font: Res<LoadedFont>,
 ) {
 
-    let window = window_query.single();
+    assert_eq!(window_query.iter().count(), 1);
+    assert_eq!(camera_query.iter().count(), 1);
 
-    for (gene_entity, mut display, node, transform) in &mut query {
+    for (gene_entity, display, relative_cursor_position) in &mut query {
+        if display.character_type == CharacterType::Enemy {
+            continue;
+        }
         commands.entity(gene_entity).despawn_descendants();
-        match window.cursor_position() {
-            Some(mouse_position) => {
-                let node_position = transform.translation();
-                let node_size = node.size();
-                let node_rect = Rect::new(
-                    node_position.x,
-                    node_position.y,
-                    node_position.x + node_size.x,
-                    node_position.y + node_size.y,
-                );
-
-                if node_rect.contains(mouse_position) {
-                    commands.entity(gene_entity).with_children(
-                        |parent| {
-                            render_gene_card(
-                                parent,
-                                display.get_gene_symbol().unwrap_or(' ').to_string(),
-                                font.clone(),
-                            );
-                        }
+        if relative_cursor_position.mouse_over() {
+            commands.entity(gene_entity).with_children(
+                |parent| {
+                    render_gene_card(
+                        parent,
+                        display.get_gene_symbol().unwrap_or(' ').to_string(),
+                        loaded_font.0.clone(),
                     );
                 }
-            }
-            None => {}
+            );
         }
     }
 
@@ -462,7 +458,8 @@ fn initialize_gene_container(parent: &mut ChildBuilder, font: Handle<Font>, char
                         JustifyContent::FlexStart,
                         5.0,
                     )
-                ).insert(GenomeDisplayComponent::new(character_type, None, i));
+                ).insert(RelativeCursorPosition::default())
+                .insert(GenomeDisplayComponent::new(character_type, None, i));
             }
         }
     );
@@ -476,7 +473,7 @@ fn render_gene_card(
     parent.spawn(
         get_text_bundle(
             &display.to_string(),
-            get_text_style(font.clone(), Color::WHITE, 20.0),
+            get_text_style(font.clone(), Color::LIME_GREEN, 20.0),
             JustifyContent::FlexStart,
             5.0,
         )

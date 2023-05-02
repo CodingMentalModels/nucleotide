@@ -118,6 +118,7 @@ State Machine that controls Game Phases:
 
 ### V1
 [x] Basic versions of systems implemented for Battle and Components
+[ ] Basic drafting system implemented
 [ ] Models loaded and displaying on screen
 [ ] 10 basic genes and 3 basic enemies
 

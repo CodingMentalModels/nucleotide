@@ -119,7 +119,53 @@ State Machine that controls Game Phases:
 ### V1
 [x] Basic versions of systems implemented for Battle and Components
 [ ] Basic drafting system implemented
+[ ] Game Over Screen
 [ ] Models loaded and displaying on screen
 [ ] 10 basic genes and 3 basic enemies
 
 ### V2
+[ ] Bosses
+
+
+## Content
+
+### Status Effects
+- Dodge - % to negate damage
+- Poison - Deal n damage and decrement by 1
+- Critical - % to double damage
+- 
+
+### Genes
+
+#### Attacks
+[ ] Sting
+[ ] Stomp -- Massive Damage
+[ ] Slash
+[ ] Claw
+[ ] Rake
+[ ] Echolocate
+[ ] Swarm
+[ ] Constrict
+[ ] Shock
+[ ] Gore
+
+#### Defense
+[x] Block
+[ ] Camoflauge -- +50% Temporary Dodge
+[ ] Run -- 100% Chance to excape the fight, but gain no rewards
+[ ] Bioluminescence
+[ ] Regenerate
+[ ] Mimic -- Perform the last ability that the target performed
+[ ] 
+
+
+#### Transcription
+[x] Reverse
+[ ] Skip
+[ ] Repeat
+
+### Bosses
+
+
+### Enemies
+

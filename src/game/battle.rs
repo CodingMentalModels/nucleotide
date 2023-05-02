@@ -21,6 +21,7 @@ impl Plugin for BattlePlugin {
         .insert_resource(GeneCommandQueue::default())
         .add_event::<DamageEvent>()
         .add_event::<BlockEvent>()
+        .add_event::<GeneProcessingEvent>()
         .add_systems((
             initialize_battle_system.in_schedule(OnEnter(NucleotideState::InitializingBattle)),
             character_acting_system.in_schedule(OnEnter(NucleotideState::CharacterActing)),
@@ -28,6 +29,7 @@ impl Plugin for BattlePlugin {
             handle_gene_commands_system.in_schedule(OnEnter(NucleotideState::GeneCommandHandling)),
             update_health_system.in_schedule(OnEnter(NucleotideState::GeneCommandHandling)).after(handle_gene_commands_system),
             update_block_system.in_schedule(OnEnter(NucleotideState::GeneCommandHandling)).after(handle_gene_commands_system),
+            update_gene_processing_system.in_schedule(OnEnter(NucleotideState::GeneCommandHandling)).after(handle_gene_commands_system),
             finished_handling_gene_system.run_if(in_state(NucleotideState::GeneEventHandling)),
             render_character_display_system.in_schedule(OnEnter(NucleotideState::GeneAnimating)),
             render_genome_system.in_schedule(OnEnter(NucleotideState::GeneAnimating)),
@@ -53,6 +55,15 @@ struct DamageEvent(TargetEntity, u8);
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 struct BlockEvent(TargetEntity, u8);
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+struct GeneProcessingEvent(TargetEntity, GeneProcessingEventType);
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum GeneProcessingEventType {
+    Reverse,
+}
+
 
 // End Events
 
@@ -122,11 +133,10 @@ fn gene_loading_system(
 
     let (
         acting_entity,
-        mut genome,
+        genome,
     ) = query.get_mut(character_acting.0).unwrap();
 
     let gene = genome.get_active_gene();
-    genome.advance_pointer();
 
     let gene_spec = gene_specs.0.get_spec_from_name(&gene).expect("Gene should exist as a gene spec.");
     let targets = get_targets(acting_entity, character_type_to_entity_map, gene_spec.get_target());
@@ -147,6 +157,7 @@ fn handle_gene_commands_system(
     mut damage_event_writer: EventWriter<DamageEvent>,
     mut block_event_writer: EventWriter<BlockEvent>,
     mut pause_unpause_event_writer: EventWriter<PauseUnpauseEvent>,
+    mut gene_processing_event_writer: EventWriter<GeneProcessingEvent>,
 ) {
 
     for (gene_command, target_entity) in gene_command_queue.0.iter() {
@@ -157,6 +168,9 @@ fn handle_gene_commands_system(
             GeneCommand::Block(amount) => {
                 block_event_writer.send(BlockEvent(*target_entity, *amount));
             },
+            GeneCommand::ReverseGeneProcessing => {
+                gene_processing_event_writer.send(GeneProcessingEvent(*target_entity, GeneProcessingEventType::Reverse));
+            }
             _ => panic!("Unimplemented Gene Command!")
         }
     }
@@ -194,9 +208,31 @@ fn update_block_system(
 
 }
 
+fn update_gene_processing_system(
+    mut query: Query<(Entity, &mut GenomeComponent)>,
+    mut gene_processing_event_reader: EventReader<GeneProcessingEvent>,
+) {
+
+    for gene_processing_event in gene_processing_event_reader.iter() {
+        if let Ok((_, mut genome)) = query.get_mut(gene_processing_event.0) {
+            match gene_processing_event.1 {
+                GeneProcessingEventType::Reverse => {
+                    genome.reverse_processing_order();
+                }
+            }
+        }
+    }
+}
+
 fn finished_handling_gene_system(
     mut commands: Commands,
+    character_acting: ResMut<CharacterActing>,
+    mut query: Query<&mut GenomeComponent>,
 ) {
+    let mut genome = query.get_mut(character_acting.0).unwrap();
+
+    genome.advance_pointer();
+
     commands.insert_resource(NextState(Some(NucleotideState::GeneAnimating)));
 }
 
@@ -266,20 +302,22 @@ pub struct EnemyComponent;
 #[derive(Component, Clone)]
 pub struct GenomeComponent {
     pub genes: Vec<String>,
-    pub pointer: usize
+    pub pointer: usize,
+    pub processing_order: GeneProcessingOrder,
 }
 
 impl GenomeComponent {
 
-    pub fn new(genes: Vec<String>, pointer: usize) -> Self {
+    pub fn new(genes: Vec<String>, pointer: usize, processing_order: GeneProcessingOrder) -> Self {
         GenomeComponent {
             genes,
-            pointer
+            pointer,
+            processing_order,
         }
     }
 
     pub fn instantiate(genes: Vec<String>) -> Self {
-        Self::new(genes, 0)
+        Self::new(genes, 0, GeneProcessingOrder::Forward)
     }
 
     pub fn get_genes(&self) -> Vec<String> {
@@ -291,14 +329,24 @@ impl GenomeComponent {
     }
 
     pub fn get_active_gene(&self) -> String {
-        self.genes.get(self.pointer).expect("Genome pointer should always be valid").clone()
+        self.genes.get(self.pointer).expect(&format!("Genome pointer should always be valid but was {}", self.pointer)).clone()
     }
 
     pub fn advance_pointer(&mut self) {
-        self.pointer = (self.pointer + 1) % self.genes.len();
+        let pointer_delta = match self.processing_order {
+            GeneProcessingOrder::Forward => 1,
+            GeneProcessingOrder::Reverse => -1,
+        };
+        self.pointer = ((self.pointer as i32 + pointer_delta).rem_euclid(self.genes.len() as i32)) as usize;
+    }
+
+    pub fn reverse_processing_order(&mut self) {
+        self.processing_order = match self.processing_order {
+            GeneProcessingOrder::Forward => GeneProcessingOrder::Reverse,
+            GeneProcessingOrder::Reverse => GeneProcessingOrder::Forward,
+        }
     }
 }
-
 
 #[derive(Component, Clone, Copy)]
 pub struct EnergyComponent {
@@ -325,6 +373,16 @@ pub struct BlockComponent(pub u8);
 
 
 // End Components
+
+// Helper Types
+
+#[derive(Clone)]
+pub enum GeneProcessingOrder {
+    Forward,
+    Reverse,
+}
+
+// End Helper Types
 
 // Helper Functions
 

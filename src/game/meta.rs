@@ -26,7 +26,12 @@ fn instantiate_meta_system(
     enemy_specs: Res<EnemySpecs>,
 ) {
 
-    let player_genome = vec!["Sting".to_string(), "Block".to_string()];
+    let player_genome = vec![
+        "Sting".to_string(),
+        "Block".to_string(),
+        "Reverse".to_string(),
+        "Stomp".to_string(),
+        ];
     let player = Player::new(
         "Player".to_string(),
         STARTING_PLAYER_HEALTH,

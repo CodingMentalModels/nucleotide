@@ -360,16 +360,16 @@ fn hover_over_gene_system(
     assert_eq!(camera_query.iter().count(), 1);
 
     for (gene_entity, display, relative_cursor_position) in &mut query {
-        if display.character_type == CharacterType::Enemy {
-            continue;
-        }
         commands.entity(gene_entity).despawn_descendants();
         if relative_cursor_position.mouse_over() {
+            let gene_card_text = display.get_gene_symbol().and_then(
+                |symbol| gene_specs.0.get_card_from_symbol(symbol)
+            ).unwrap_or(" ".to_string());
             commands.entity(gene_entity).with_children(
                 |parent| {
                     render_gene_card(
                         parent,
-                        display.get_gene_symbol().unwrap_or(' ').to_string(),
+                        gene_card_text,
                         loaded_font.0.clone(),
                     );
                 }
@@ -473,10 +473,10 @@ fn render_gene_card(
     parent.spawn(
         get_text_bundle(
             &display.to_string(),
-            get_text_style(font.clone(), Color::LIME_GREEN, 20.0),
+            get_text_style(font.clone(), Color::WHITE, 20.0),
             JustifyContent::FlexStart,
-            5.0,
-        )
+            0.0,
+        ).with_background_color(Color::DARK_GRAY)
     );
 }
 // End Helper Functions

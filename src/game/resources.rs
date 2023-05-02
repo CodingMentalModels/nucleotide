@@ -181,4 +181,19 @@ impl GeneSpecLookup {
     pub fn get_symbol_from_name(&self, name: &str) -> Option<Symbol> {
         self.name_to_symbol.get(name).copied()
     }
+
+    pub fn get_card_from_symbol(&self, symbol: Symbol) -> Option<String> {
+        self.get_name_from_symbol(symbol)
+            .map(|name| (name, self.get_text_from_symbol(symbol).unwrap()))
+            .map(|(name, text)| format!("{} ({}) \n\n{}", name, symbol, text))
+    }
+
+    pub fn get_text_from_symbol(&self, symbol: Symbol) -> Option<String> {
+        self.get_spec_from_symbol(symbol).map(|spec| spec.get_text())
+    }
+
 }
+
+
+#[derive(Debug, Clone, PartialEq, Eq, Hash, Resource)]
+pub struct LoadedFont(pub Handle<Font>);

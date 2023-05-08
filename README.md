@@ -163,6 +163,17 @@ State Machine that controls Game Phases:
 [x] Reverse
 [ ] Skip
 [ ] Repeat
+[ ] ATP50 -- Get more energy
+
+#### Potions
+- Oxytocin
+- Dopamine
+- Seratonin
+- Cortisol
+- Norepinephrine - Fight or Flight -- Choose between bonus damage and bonus evasion
+- GABA - Reduce damage
+- Acetylcholine - Learning / Memory - Research an undiscovered gene
+- Adrenelin - Double your energy
 
 ### Bosses
 

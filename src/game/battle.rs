@@ -6,7 +6,9 @@ use crate::game::resources::*;
 use crate::game::constants::*;
 use crate::game::input::PauseUnpauseEvent;
 
+use super::specs::ActivationTiming;
 use super::specs::EnemyName;
+use super::specs::StatusEffect;
 use super::specs::{GeneCommand, TargetType};
 use super::ui::GenomeDisplayComponent;
 use super::ui::{DisplayComponent, CharacterStatComponent};
@@ -17,20 +19,30 @@ pub struct BattlePlugin;
 
 impl Plugin for BattlePlugin {
     fn build(&self, app: &mut App) {
+        let get_event_handling_system_condition = || {
+            in_state(NucleotideState::GeneCommandHandling)
+                .or_else(in_state(NucleotideState::StartOfTurn))
+                .or_else(in_state(NucleotideState::EndOfTurn))
+            };
+
         app
         .insert_resource(GeneCommandQueue::default())
         .add_event::<DamageEvent>()
         .add_event::<BlockEvent>()
         .add_event::<GeneProcessingEvent>()
+        .add_event::<StatusEffectEvent>()
         .add_systems((
             initialize_battle_system.in_schedule(OnEnter(NucleotideState::InitializingBattle)),
             character_acting_system.in_schedule(OnEnter(NucleotideState::CharacterActing)),
+            handle_start_of_turn_statuses_system.in_schedule(OnEnter(NucleotideState::StartOfTurn)),
             gene_loading_system.in_schedule(OnEnter(NucleotideState::GeneLoading)),
             handle_gene_commands_system.in_schedule(OnEnter(NucleotideState::GeneCommandHandling)),
-            update_health_system.in_schedule(OnEnter(NucleotideState::GeneCommandHandling)).after(handle_gene_commands_system),
-            update_block_system.in_schedule(OnEnter(NucleotideState::GeneCommandHandling)).after(handle_gene_commands_system),
-            update_gene_processing_system.in_schedule(OnEnter(NucleotideState::GeneCommandHandling)).after(handle_gene_commands_system),
-            finished_handling_gene_system.run_if(in_state(NucleotideState::GeneEventHandling)),
+            handle_damage_system.run_if(get_event_handling_system_condition()),
+            update_block_system.run_if(get_event_handling_system_condition()),
+            update_gene_processing_system.run_if(get_event_handling_system_condition()),
+            apply_status_effect_system.run_if(get_event_handling_system_condition()),
+            handle_end_of_turn_statuses_system.in_schedule(OnEnter(NucleotideState::EndOfTurn)),
+            finished_handling_gene_system.run_if(in_state(NucleotideState::EndOfTurn)),
             render_character_display_system.in_schedule(OnEnter(NucleotideState::GeneAnimating)),
             render_genome_system.in_schedule(OnEnter(NucleotideState::GeneAnimating)),
             finished_animating_gene_system.run_if(in_state(NucleotideState::GeneAnimating)),
@@ -60,10 +72,12 @@ struct BlockEvent(TargetEntity, u8);
 struct GeneProcessingEvent(TargetEntity, GeneProcessingEventType);
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
+struct StatusEffectEvent(TargetEntity, StatusEffect, u8);
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
 enum GeneProcessingEventType {
     Reverse,
 }
-
 
 // End Events
 
@@ -116,9 +130,23 @@ fn character_acting_system(
         energy.energy_remaining -= 1;
     }
 
-    commands.insert_resource(NextState(Some(NucleotideState::GeneLoading)));
+    commands.insert_resource(NextState(Some(NucleotideState::StartOfTurn)));
     pause_unpause_event_writer.send(PauseUnpauseEvent);
 
+}
+
+fn handle_start_of_turn_statuses_system(
+    mut commands: Commands,
+    query: Query<(Entity, &mut StatusEffectComponent, &mut GenomeComponent)>,
+    damage_event_writer: EventWriter<DamageEvent>,
+    mut pause_unpause_event_writer: EventWriter<PauseUnpauseEvent>,
+) {
+
+    handle_statuses(query, damage_event_writer, ActivationTiming::StartOfTurn);
+
+    commands.insert_resource(NextState(Some(NucleotideState::GeneLoading)));
+
+    pause_unpause_event_writer.send(PauseUnpauseEvent);
 }
 
 fn gene_loading_system(
@@ -158,6 +186,7 @@ fn handle_gene_commands_system(
     mut block_event_writer: EventWriter<BlockEvent>,
     mut pause_unpause_event_writer: EventWriter<PauseUnpauseEvent>,
     mut gene_processing_event_writer: EventWriter<GeneProcessingEvent>,
+    mut status_effect_event_writer: EventWriter<StatusEffectEvent>,
 ) {
 
     for (gene_command, target_entity) in gene_command_queue.0.iter() {
@@ -170,6 +199,9 @@ fn handle_gene_commands_system(
             },
             GeneCommand::ReverseGeneProcessing => {
                 gene_processing_event_writer.send(GeneProcessingEvent(*target_entity, GeneProcessingEventType::Reverse));
+            },
+            GeneCommand::Status(effect, n_stacks) => {
+                status_effect_event_writer.send(StatusEffectEvent(*target_entity, *effect, *n_stacks));
             }
             _ => panic!("Unimplemented Gene Command!")
         }
@@ -177,11 +209,11 @@ fn handle_gene_commands_system(
 
     gene_command_queue.0.clear();
 
-    commands.insert_resource(NextState(Some(NucleotideState::GeneEventHandling)));
+    commands.insert_resource(NextState(Some(NucleotideState::EndOfTurn)));
     pause_unpause_event_writer.send(PauseUnpauseEvent);
 }
 
-fn update_health_system(
+fn handle_damage_system(
     mut query: Query<(Entity, &mut HealthComponent, &mut BlockComponent)>,
     mut damage_event_reader: EventReader<DamageEvent>,
 ) {
@@ -224,6 +256,26 @@ fn update_gene_processing_system(
     }
 }
 
+fn apply_status_effect_system(
+    mut query: Query<(Entity, &mut StatusEffectComponent)>,
+    mut status_effect_event_reader: EventReader<StatusEffectEvent>,
+) {
+
+    for status_effect_event in status_effect_event_reader.iter() {
+        if let Ok((_, mut status_effect)) = query.get_mut(status_effect_event.0) {
+            status_effect.0.push((status_effect_event.1, status_effect_event.2));
+        }
+    }
+}
+
+fn handle_end_of_turn_statuses_system(
+    query: Query<(Entity, &mut StatusEffectComponent, &mut GenomeComponent)>,
+    damage_event_writer: EventWriter<DamageEvent>,
+) {
+
+    handle_statuses(query, damage_event_writer, ActivationTiming::EndOfTurn);
+}
+
 fn finished_handling_gene_system(
     mut commands: Commands,
     character_acting: ResMut<CharacterActing>,
@@ -236,19 +288,23 @@ fn finished_handling_gene_system(
     commands.insert_resource(NextState(Some(NucleotideState::GeneAnimating)));
 }
 
+
 fn render_character_display_system(
-    character_display_query: Query<(Entity, &HealthComponent, &BlockComponent, &EnergyComponent)>,
+    character_display_query: Query<(Entity, &HealthComponent, &BlockComponent, &EnergyComponent, &StatusEffectComponent)>,
     mut display_query: Query<(&CharacterStatComponent, &mut DisplayComponent)>,
     character_type_to_entity_map: Res<CharacterTypeToEntity>,
 ) {
 
-    for (entity, health, block, energy) in character_display_query.iter() {
+    for (entity, health, block, energy, status_effects) in character_display_query.iter() {
         for (display_component, mut display) in display_query.iter_mut() {
             if entity == character_type_to_entity_map.get(display_component.0) {
                 match display_component.1 {
                     CharacterStatType::Health => display.value = health.0.to_string(),
                     CharacterStatType::Block => display.value = block.0.to_string(),
                     CharacterStatType::Energy => display.value = format!("{} / {}", energy.energy_remaining, energy.starting_energy),
+                    CharacterStatType::Statuses => display.value = status_effects.0
+                        .iter().map(|(status, n_stacks)| format!("{:?}({})", status, n_stacks.to_string()))
+                        .collect::<Vec<_>>().join(" | "),
                 }
             }
         }
@@ -304,20 +360,22 @@ pub struct GenomeComponent {
     pub genes: Vec<String>,
     pub pointer: usize,
     pub processing_order: GeneProcessingOrder,
+    pub repeat_gene: u8,
 }
 
 impl GenomeComponent {
 
-    pub fn new(genes: Vec<String>, pointer: usize, processing_order: GeneProcessingOrder) -> Self {
+    pub fn new(genes: Vec<String>, pointer: usize, processing_order: GeneProcessingOrder, repeat_gene: u8) -> Self {
         GenomeComponent {
             genes,
             pointer,
             processing_order,
+            repeat_gene,
         }
     }
 
     pub fn instantiate(genes: Vec<String>) -> Self {
-        Self::new(genes, 0, GeneProcessingOrder::Forward)
+        Self::new(genes, 0, GeneProcessingOrder::Forward, 0)
     }
 
     pub fn get_genes(&self) -> Vec<String> {
@@ -333,6 +391,10 @@ impl GenomeComponent {
     }
 
     pub fn advance_pointer(&mut self) {
+        if self.repeat_gene > 0 {
+            self.repeat_gene -= 1;
+            return;
+        }
         let pointer_delta = match self.processing_order {
             GeneProcessingOrder::Forward => 1,
             GeneProcessingOrder::Reverse => -1,
@@ -346,6 +408,11 @@ impl GenomeComponent {
             GeneProcessingOrder::Reverse => GeneProcessingOrder::Forward,
         }
     }
+
+    pub fn increment_repeat_gene(&mut self) {
+        self.repeat_gene += 1;
+    }
+
 }
 
 #[derive(Component, Clone, Copy)]
@@ -371,6 +438,9 @@ pub struct HealthComponent(pub u8);
 #[derive(Component, Clone, Copy)]
 pub struct BlockComponent(pub u8);
 
+#[derive(Component, Clone)]
+pub struct StatusEffectComponent(pub Vec<(StatusEffect, u8)>);
+
 
 // End Components
 
@@ -393,6 +463,7 @@ fn instantiate_player(mut commands: &mut Commands, player: Res<Player>) -> Entit
         .insert(HealthComponent(player.get_health()))
         .insert(BlockComponent(0))
         .insert(EnergyComponent::new(player.get_energy(), player.get_energy()))
+        .insert(StatusEffectComponent(vec![]))
         .id()
 }
 
@@ -405,6 +476,7 @@ fn instantiate_enemy(commands: &mut Commands, enemy_name: EnemyName, gene_specs:
         .insert(HealthComponent(enemy_spec.get_health()))
         .insert(BlockComponent(0))
         .insert(EnergyComponent::new(enemy_spec.get_energy(), enemy_spec.get_energy()))
+        .insert(StatusEffectComponent(vec![]))
         .id()
 }
 
@@ -417,6 +489,32 @@ fn get_targets(acting_entity: Entity, character_type_to_entity_map: Res<Characte
         TargetType::Everyone => {
             character_type_to_entity_map.get_all()
         },
+    }
+}
+
+fn handle_statuses(
+    mut query: Query<(Entity, &mut StatusEffectComponent, &mut GenomeComponent)>,
+    mut damage_event_writer: EventWriter<DamageEvent>,
+    activation_timing: ActivationTiming,
+) {
+    for (entity, mut status_effect, mut genome) in query.iter_mut() {
+        status_effect.0.retain_mut(|(status_effect_type, n_stacks)| {
+            if status_effect_type.get_activation_timing() != activation_timing {
+                return true;
+            }
+            match status_effect_type {
+                StatusEffect::Poison => {
+                    damage_event_writer.send(DamageEvent(entity, *n_stacks));
+                    *n_stacks -= 1;
+                },
+                StatusEffect::RepeatGene => {
+                    genome.increment_repeat_gene();
+                    *n_stacks -= 1;
+                },
+                _ => panic!("Unimplemented Status Effect! {:?}", status_effect_type)
+            };
+            *n_stacks > 0
+        });
     }
 }
 

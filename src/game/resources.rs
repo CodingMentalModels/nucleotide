@@ -23,9 +23,11 @@ pub enum NucleotideState {
     Drafting,
     InitializingBattle,
     CharacterActing,
+    StartOfTurn,
     GeneLoading,
     GeneCommandHandling,
-    GeneEventHandling,
+    FinishedGeneCommandHandling,
+    EndOfTurn,
     GeneAnimating,
     GameOver,
     Victory,
@@ -143,6 +145,7 @@ pub enum CharacterStatType {
     Health,
     Block,
     Energy,
+    Statuses,
 }
 
 

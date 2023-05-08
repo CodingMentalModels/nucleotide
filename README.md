@@ -108,6 +108,36 @@ State Machine that controls Game Phases:
     - GainEnergy(u8)
 
 
+## Genes
+
+### Offensive
+- Sting
+- Tail Swipe
+- Stomp
+- Bite
+- Claw
+- Trample
+
+
+
+### Defensive
+- Block
+- Camoflauge
+- Thorns
+- Regeneration
+- 
+
+### Gene Processing
+- Stop Codon
+- Repeat Codon
+- Reverse Codon
+- Goto Codon
+
+### Meta
+
+
+## Enemies
+
 ## Implementation Plan
 
 ### V0
@@ -122,6 +152,8 @@ State Machine that controls Game Phases:
 [ ] Game Over Screen
 [ ] Models loaded and displaying on screen
 [ ] 10 basic genes and 3 basic enemies
+    [ ] Status effects need to wear out at the appropriate time (e.g. block at the beginning of turn)
+    [ ] Status effects need to stack (right now you just get multiple status effects with stacks of whatever they were added with)
 
 ### V2
 [ ] Bosses

@@ -40,7 +40,7 @@ impl Plugin for BattlePlugin {
             handle_damage_system.run_if(get_event_handling_system_condition()),
             update_block_system.run_if(get_event_handling_system_condition()),
             update_gene_processing_system.run_if(get_event_handling_system_condition()),
-            apply_status_effect_system.run_if(get_event_handling_system_condition()),
+            apply_status_effect_system.run_if(in_state(NucleotideState::GeneCommandHandling)),
             handle_end_of_turn_statuses_system.in_schedule(OnEnter(NucleotideState::EndOfTurn)),
             finished_handling_gene_system.run_if(in_state(NucleotideState::EndOfTurn)),
             render_character_display_system.in_schedule(OnEnter(NucleotideState::GeneAnimating)),
@@ -302,9 +302,11 @@ fn render_character_display_system(
                     CharacterStatType::Health => display.value = health.0.to_string(),
                     CharacterStatType::Block => display.value = block.0.to_string(),
                     CharacterStatType::Energy => display.value = format!("{} / {}", energy.energy_remaining, energy.starting_energy),
-                    CharacterStatType::Statuses => display.value = status_effects.0
+                    CharacterStatType::Statuses => {
+                        display.value = status_effects.0
                         .iter().map(|(status, n_stacks)| format!("{:?}({})", status, n_stacks.to_string()))
-                        .collect::<Vec<_>>().join(" | "),
+                        .collect::<Vec<_>>().join(" | ");
+                    }
                 }
             }
         }

@@ -108,7 +108,7 @@ impl StatusEffect {
         match self {
             StatusEffect::Poison => ActivationTiming::EndOfTurn,
             StatusEffect::Weak => ActivationTiming::NotApplicable,
-            StatusEffect::RepeatGene => ActivationTiming::EndOfTurn,
+            StatusEffect::RepeatGene => ActivationTiming::StartOfTurn,
         }
     }
 

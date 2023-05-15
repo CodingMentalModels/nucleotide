@@ -5,7 +5,7 @@ pub const GENE_SPEC_DIRECTORY: &str = "assets/specs/genes/";
 
 // Game Parameters
 pub const STARTING_PLAYER_ENERGY: u8 = 3;
-pub const STARTING_PLAYER_HEALTH: u8 = 100;
+pub const STARTING_PLAYER_HEALTH: u8 = 2;
 
 // Greek Letters
 pub const ALPHA_LOWER: char = 'α';

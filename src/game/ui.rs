@@ -10,16 +10,33 @@ pub struct UIPlugin;
 
 impl Plugin for UIPlugin {
     fn build(&self, app: &mut App) {
+
+        let get_battle_states_condition = || {
+            in_state(NucleotideState::Paused)
+                .or_else(in_state(NucleotideState::Paused))
+                .or_else(in_state(NucleotideState::InstantiatingMeta))
+                .or_else(in_state(NucleotideState::Drafting))
+                .or_else(in_state(NucleotideState::InitializingBattle))
+                .or_else(in_state(NucleotideState::CharacterActing))
+                .or_else(in_state(NucleotideState::StartOfTurn))
+                .or_else(in_state(NucleotideState::GeneLoading))
+                .or_else(in_state(NucleotideState::GeneCommandHandling))
+                .or_else(in_state(NucleotideState::FinishedGeneCommandHandling))
+                .or_else(in_state(NucleotideState::EndOfTurn))
+                .or_else(in_state(NucleotideState::GeneAnimating))
+            };
+
         app
             .add_plugin(EguiPlugin)
             .add_systems((
                 configure_visuals.in_schedule(OnEnter(NucleotideState::LoadingUI)),
                 ui_load_system.in_schedule(OnEnter(NucleotideState::LoadingUI)),
                 render_system.run_if(in_state(NucleotideState::GeneAnimating)),
-                display_state_system,
-                display_genome_system,
-                hover_over_gene_system.after(display_genome_system),
-                paused_ui_system.run_if(in_state(NucleotideState::Paused))
+                display_state_system.run_if(get_battle_states_condition()),
+                display_genome_system.run_if(get_battle_states_condition()),
+                hover_over_gene_system.run_if(get_battle_states_condition()).after(display_genome_system),
+                paused_ui_system.run_if(in_state(NucleotideState::Paused)),
+                game_over_ui_system.run_if(in_state(NucleotideState::GameOver)),
             ));
     }
 }
@@ -305,6 +322,30 @@ fn paused_ui_system(
         );
 }
 
+
+fn game_over_ui_system(
+    mut egui_ctx: EguiContexts,
+) {
+    egui::Area::new("game-over-menu")
+        .anchor(egui::Align2::CENTER_CENTER, egui::Vec2::ZERO)
+        .show(
+            egui_ctx.ctx_mut(), 
+            |ui| {
+                ui.with_layout(
+                    egui::Layout::top_down(egui::Align::Center), |ui| {
+                        ui.label(
+                            egui::RichText::new("Game Over")
+                            .size(20.)
+                            .text_style(egui::TextStyle::Heading)
+                            .underline()
+                            .color(egui::Color32::BLACK)
+                        );
+
+                    }
+                );
+            }
+        );
+}
 
 // Helper Functions
 

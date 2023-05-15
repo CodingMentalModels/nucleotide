@@ -46,6 +46,7 @@ impl Plugin for BattlePlugin {
             render_character_display_system.in_schedule(OnEnter(NucleotideState::GeneAnimating)),
             render_genome_system.in_schedule(OnEnter(NucleotideState::GeneAnimating)),
             finished_animating_gene_system.run_if(in_state(NucleotideState::GeneAnimating)),
+            game_over_system.run_if(in_state(NucleotideState::GameOver)),
         ));
     }
 }
@@ -136,27 +137,27 @@ fn character_acting_system(
 }
 
 fn handle_start_of_turn_statuses_system(
-    mut commands: Commands,
     query: Query<(Entity, &mut StatusEffectComponent, &mut GenomeComponent)>,
     damage_event_writer: EventWriter<DamageEvent>,
     mut pause_unpause_event_writer: EventWriter<PauseUnpauseEvent>,
+    mut next_state: ResMut<NextState<NucleotideState>>,
 ) {
 
     handle_statuses(query, damage_event_writer, ActivationTiming::StartOfTurn);
 
-    commands.insert_resource(NextState(Some(NucleotideState::GeneLoading)));
+    queue_next_state_if_not_already_queued(&mut next_state, NucleotideState::GeneLoading);
 
     pause_unpause_event_writer.send(PauseUnpauseEvent);
 }
 
 fn gene_loading_system(
-    mut commands: Commands,
     character_acting: ResMut<CharacterActing>,
     character_type_to_entity_map: Res<CharacterTypeToEntity>,
     mut gene_command_queue: ResMut<GeneCommandQueue>,
     gene_specs: Res<GeneSpecs>,
     mut query: Query<(Entity, &mut GenomeComponent)>,
     mut pause_unpause_event_writer: EventWriter<PauseUnpauseEvent>,
+    mut next_state: ResMut<NextState<NucleotideState>>,
 ) {
 
     let (
@@ -174,19 +175,19 @@ fn gene_loading_system(
             .map(|gene_command| targets.iter().map(|target| (gene_command.clone(), target.clone()))).flatten().collect()
     );
 
-    commands.insert_resource(NextState(Some(NucleotideState::GeneCommandHandling)));
+    queue_next_state_if_not_already_queued(&mut next_state, NucleotideState::GeneCommandHandling);
     pause_unpause_event_writer.send(PauseUnpauseEvent);
 
 }
 
 fn handle_gene_commands_system(
-    mut commands: Commands,
     mut gene_command_queue: ResMut<GeneCommandQueue>,
     mut damage_event_writer: EventWriter<DamageEvent>,
     mut block_event_writer: EventWriter<BlockEvent>,
     mut pause_unpause_event_writer: EventWriter<PauseUnpauseEvent>,
     mut gene_processing_event_writer: EventWriter<GeneProcessingEvent>,
     mut status_effect_event_writer: EventWriter<StatusEffectEvent>,
+    mut next_state: ResMut<NextState<NucleotideState>>,
 ) {
 
     for (gene_command, target_entity) in gene_command_queue.0.iter() {
@@ -209,22 +210,32 @@ fn handle_gene_commands_system(
 
     gene_command_queue.0.clear();
 
-    commands.insert_resource(NextState(Some(NucleotideState::EndOfTurn)));
+    queue_next_state_if_not_already_queued(&mut next_state, NucleotideState::EndOfTurn);
     pause_unpause_event_writer.send(PauseUnpauseEvent);
 }
 
 fn handle_damage_system(
     mut query: Query<(Entity, &mut HealthComponent, &mut BlockComponent)>,
     mut damage_event_reader: EventReader<DamageEvent>,
+    character_type_to_entity: Res<CharacterTypeToEntity>,
+    mut next_state: ResMut<NextState<NucleotideState>>,
 ) {
 
     for damage_event in damage_event_reader.iter() {
-        if let Ok((_, mut health, mut block)) = query.get_mut(damage_event.0) {
+        if let Ok((entity, mut health, mut block)) = query.get_mut(damage_event.0) {
             let damage = damage_event.1.saturating_sub(block.0);
             block.0 = block.0.saturating_sub(damage_event.1);
             health.0 = health.0.saturating_sub(damage);
+
+            if health.0 == 0 {
+                match character_type_to_entity.get_character_type(entity) {
+                    CharacterType::Player => queue_next_state_if_not_already_queued(&mut next_state, NucleotideState::GameOver),
+                    CharacterType::Enemy => queue_next_state_if_not_already_queued(&mut next_state, NucleotideState::BattleVictory),
+                }
+            }
         }
     }
+
 
 }
 
@@ -342,9 +353,15 @@ fn render_genome_system(
 }
 
 fn finished_animating_gene_system(
-    mut commands: Commands,
+    mut next_state: ResMut<NextState<NucleotideState>>
 ) {
-    commands.insert_resource(NextState(Some(NucleotideState::CharacterActing)));
+    queue_next_state_if_not_already_queued(&mut next_state, NucleotideState::CharacterActing);
+}
+
+fn game_over_system(
+
+) {
+    panic!("Game Over");
 }
 
 // End Systems
@@ -517,6 +534,18 @@ fn handle_statuses(
             };
             *n_stacks > 0
         });
+    }
+}
+
+fn queue_next_state_if_not_already_queued(
+    next_state: &mut ResMut<NextState<NucleotideState>>,
+    next_state_to_queue: NucleotideState,
+) {
+    if next_state.0.is_none() {
+        println!("Setting state to {:?}", next_state_to_queue);
+        next_state.0 = Some(next_state_to_queue);
+    } else {
+        println!("State already queued to {:?}, not setting to {:?}", next_state.0.unwrap(), next_state_to_queue);
     }
 }
 

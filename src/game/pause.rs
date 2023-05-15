@@ -7,10 +7,26 @@ pub struct PausePlugin;
 
 impl Plugin for PausePlugin {
     fn build(&self, app: &mut App) {
+        let get_pause_states_condition = || {
+            in_state(NucleotideState::Paused)
+                .or_else(in_state(NucleotideState::Paused))
+                .or_else(in_state(NucleotideState::InstantiatingMeta))
+                .or_else(in_state(NucleotideState::Drafting))
+                .or_else(in_state(NucleotideState::InitializingBattle))
+                .or_else(in_state(NucleotideState::CharacterActing))
+                .or_else(in_state(NucleotideState::StartOfTurn))
+                .or_else(in_state(NucleotideState::GeneLoading))
+                .or_else(in_state(NucleotideState::GeneCommandHandling))
+                .or_else(in_state(NucleotideState::FinishedGeneCommandHandling))
+                .or_else(in_state(NucleotideState::EndOfTurn))
+                .or_else(in_state(NucleotideState::GeneAnimating))
+            };
+
         app
             .insert_resource(PausedState(NucleotideState::Paused))
             .add_system(
                 pause_system
+                    .run_if(get_pause_states_condition())
                     .before(input_system)
             );
     }

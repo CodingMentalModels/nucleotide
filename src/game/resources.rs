@@ -29,6 +29,7 @@ pub enum NucleotideState {
     FinishedGeneCommandHandling,
     EndOfTurn,
     GeneAnimating,
+    BattleVictory,
     GameOver,
     Victory,
 }
@@ -147,7 +148,7 @@ impl CharacterType {
             Self::Enemy => "Enemy",
         }.to_string()
     }
-    
+
 }
 
 

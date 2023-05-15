@@ -139,6 +139,17 @@ pub enum CharacterType {
     Enemy,
 }
 
+impl CharacterType {
+
+    pub fn to_string(&self) -> String {
+        match self {
+            Self::Player => "Player",
+            Self::Enemy => "Enemy",
+        }.to_string()
+    }
+    
+}
+
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub enum CharacterStatType {
@@ -146,6 +157,18 @@ pub enum CharacterStatType {
     Block,
     Energy,
     Statuses,
+}
+
+impl CharacterStatType {
+
+    pub fn to_string(&self) -> String {
+        match self {
+            Self::Health => "Health",
+            Self::Block => "Block",
+            Self::Energy => "Energy",
+            Self::Statuses => "Statuses",
+        }.to_string()
+    }
 }
 
 

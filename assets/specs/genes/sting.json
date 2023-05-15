@@ -5,6 +5,12 @@
     "gene_commands": [
         {
             "Damage": 6
+        },
+        {
+            "Status": [
+                "Poison",
+                3
+            ]
         }
     ]
 }

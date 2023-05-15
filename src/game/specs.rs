@@ -99,4 +99,25 @@ pub enum GeneCommand {
 pub enum StatusEffect {
     Poison,
     Weak,
+    RepeatGene,
+}
+
+impl StatusEffect {
+
+    pub fn get_activation_timing(&self) -> ActivationTiming {
+        match self {
+            StatusEffect::Poison => ActivationTiming::EndOfTurn,
+            StatusEffect::Weak => ActivationTiming::NotApplicable,
+            StatusEffect::RepeatGene => ActivationTiming::StartOfTurn,
+        }
+    }
+
+}
+
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
+pub enum ActivationTiming {
+    StartOfTurn,
+    EndOfTurn,
+    NotApplicable,
 }

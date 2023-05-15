@@ -28,8 +28,9 @@ fn instantiate_meta_system(
 
     let player_genome = vec![
         "Sting".to_string(),
+        "Repeat Codon".to_string(),
         "Block".to_string(),
-        "Reverse".to_string(),
+        "Reverse Codon".to_string(),
         "Stomp".to_string(),
         ];
     let player = Player::new(

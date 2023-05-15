@@ -229,6 +229,15 @@ fn ui_load_system(
                     )
                     ).insert(DisplayComponent::new_with_u8_value("Block".to_string(), u8::MAX))
                     .insert(CharacterStatComponent(CharacterType::Player, CharacterStatType::Block));
+                    parent.spawn(
+                        get_text_bundle(
+                            "Statuses: ",
+                            get_text_style(font.clone(), Color::WHITE, 20.0),
+                            JustifyContent::FlexStart,
+                            5.0,
+                    )
+                    ).insert(DisplayComponent::new("Statuses".to_string(), "".to_string()))
+                    .insert(CharacterStatComponent(CharacterType::Player, CharacterStatType::Statuses));
                 }
             );
 
@@ -288,6 +297,15 @@ fn ui_load_system(
                         )
                     ).insert(DisplayComponent::new_with_u8_value("Block".to_string(), u8::MAX))
                     .insert(CharacterStatComponent(CharacterType::Enemy, CharacterStatType::Block));
+                    parent.spawn(
+                        get_text_bundle(
+                            "Statuses: ",
+                            get_text_style(font.clone(), Color::WHITE, 20.0),
+                            JustifyContent::FlexStart,
+                            5.0,
+                    )
+                    ).insert(DisplayComponent::new("Statuses".to_string(), "".to_string()))
+                    .insert(CharacterStatComponent(CharacterType::Enemy, CharacterStatType::Statuses));
                 }
             );
         }

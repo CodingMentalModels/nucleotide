@@ -135,6 +135,13 @@ State Machine that controls Game Phases:
 
 ### Meta
 
+#### Drafting
+After each fight, we have the option of:
+- Choosing a gene from our fallen foe
+- Moving one gene in our genome
+- Swapping two genes in our genome
+- Researching a symbol
+
 
 ## Enemies
 

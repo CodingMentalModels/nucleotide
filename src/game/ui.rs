@@ -173,140 +173,22 @@ fn ui_load_system(
                 )
             ).insert(DisplayComponent::new("State".to_string(), "Uninitialized".to_string()));
 
-            // Player UI
-            parent.spawn(
-                NodeBundle {
-                    style: Style {
-                        size: Size::new(Val::Percent(50.0), Val::Percent(50.0)),
-                        position_type: PositionType::Absolute,
-                        position: UiRect {
-                            left: Val::Percent(0.0),
-                            top: Val::Percent(50.0),
-                            ..Default::default()
-                        },
-                        flex_direction: FlexDirection::Column,
-                        justify_content: JustifyContent::FlexStart,
-                        align_items: AlignItems::FlexStart,
-                        ..Default::default()
-                    }, background_color: Color::BLACK.into(),
-                    ..Default::default()
-                }
-            ).with_children(
-                |parent| {
-                    parent.spawn(
-                        get_text_bundle(
-                            "Player",
-                            get_text_style(font.clone(), Color::WHITE, 20.0),
-                            JustifyContent::FlexStart,
-                            5.0,
-                        )
-                    );
-                    initialize_gene_container(parent, font.clone(), CharacterType::Player);
-                    parent.spawn(
-                        get_text_bundle(
-                            "Energy: 0",
-                            get_text_style(font.clone(), Color::WHITE, 20.0),
-                            JustifyContent::FlexStart,
-                            5.0,
-                        )
-                    ).insert(DisplayComponent::new_with_u8_value("Energy".to_string(), u8::MAX))
-                    .insert(CharacterStatComponent(CharacterType::Player, CharacterStatType::Energy));
-                    parent.spawn(
-                        get_text_bundle(
-                            "Health: 999999",
-                            get_text_style(font.clone(), Color::WHITE, 20.0),
-                            JustifyContent::FlexStart,
-                            5.0,
-                        )
-                    ).insert(DisplayComponent::new_with_u8_value("Health".to_string(), u8::MAX))
-                    .insert(CharacterStatComponent(CharacterType::Player, CharacterStatType::Health));
-                    parent.spawn(
-                        get_text_bundle(
-                            "Block: 0",
-                            get_text_style(font.clone(), Color::WHITE, 20.0),
-                            JustifyContent::FlexStart,
-                            5.0,
-                    )
-                    ).insert(DisplayComponent::new_with_u8_value("Block".to_string(), u8::MAX))
-                    .insert(CharacterStatComponent(CharacterType::Player, CharacterStatType::Block));
-                    parent.spawn(
-                        get_text_bundle(
-                            "Statuses: ",
-                            get_text_style(font.clone(), Color::WHITE, 20.0),
-                            JustifyContent::FlexStart,
-                            5.0,
-                    )
-                    ).insert(DisplayComponent::new("Statuses".to_string(), "".to_string()))
-                    .insert(CharacterStatComponent(CharacterType::Player, CharacterStatType::Statuses));
-                }
+            initialize_character_ui(
+                parent,
+                font.clone(),
+                CharacterType::Player,
+                0.0,
+                50.0,
+                50.0,
             );
 
-            // Enemy UI
-            parent.spawn(
-                NodeBundle {
-                    style: Style {
-                        size: Size::new(Val::Percent(30.0), Val::Percent(30.0)),
-                        position_type: PositionType::Absolute,
-                        position: UiRect {
-                            right: Val::Percent(30.0),
-                            top: Val::Percent(0.0),
-                            ..Default::default()
-                        },
-                        flex_direction: FlexDirection::Column,
-                        justify_content: JustifyContent::FlexStart,
-                        align_items: AlignItems::FlexStart,
-                        ..Default::default()
-                    }, background_color: Color::BLACK.into(),
-                    ..Default::default()
-                }
-            ).with_children(
-                |parent| {
-                    parent.spawn(
-                        get_text_bundle(
-                            "Enemy",
-                            get_text_style(font.clone(), Color::WHITE, 20.0),
-                            JustifyContent::FlexStart,
-                            5.0,
-                        )
-                    );
-                    initialize_gene_container(parent, font.clone(), CharacterType::Enemy);
-                    parent.spawn(
-                        get_text_bundle(
-                            "Energy: 0",
-                            get_text_style(font.clone(), Color::WHITE, 20.0),
-                            JustifyContent::FlexStart,
-                            5.0,
-                        )
-                    ).insert(DisplayComponent::new_with_u8_value("Energy".to_string(), u8::MAX))
-                    .insert(CharacterStatComponent(CharacterType::Enemy, CharacterStatType::Energy));
-                    parent.spawn(
-                        get_text_bundle(
-                            "Health: 999999",
-                            get_text_style(font.clone(), Color::WHITE, 20.0),
-                            JustifyContent::FlexStart,
-                            5.0,
-                        )
-                    ).insert(DisplayComponent::new_with_u8_value("Health".to_string(), u8::MAX))
-                    .insert(CharacterStatComponent(CharacterType::Enemy, CharacterStatType::Health));
-                    parent.spawn(
-                        get_text_bundle(
-                            "Block: 0",
-                            get_text_style(font.clone(), Color::WHITE, 20.0),
-                            JustifyContent::FlexStart,
-                            5.0,
-                        )
-                    ).insert(DisplayComponent::new_with_u8_value("Block".to_string(), u8::MAX))
-                    .insert(CharacterStatComponent(CharacterType::Enemy, CharacterStatType::Block));
-                    parent.spawn(
-                        get_text_bundle(
-                            "Statuses: ",
-                            get_text_style(font.clone(), Color::WHITE, 20.0),
-                            JustifyContent::FlexStart,
-                            5.0,
-                    )
-                    ).insert(DisplayComponent::new("Statuses".to_string(), "".to_string()))
-                    .insert(CharacterStatComponent(CharacterType::Enemy, CharacterStatType::Statuses));
-                }
+            initialize_character_ui(
+                parent,
+                font.clone(),
+                CharacterType::Enemy,
+                30.0,
+                0.0,
+                30.0,
             );
         }
     );
@@ -454,6 +336,51 @@ fn get_text_style(font: Handle<Font>, color: Color, font_size: f32) -> TextStyle
     }
 }
 
+fn initialize_character_ui(
+    parent: &mut ChildBuilder,
+    font: Handle<Font>,
+    character_type: CharacterType,
+    left: f32,
+    top: f32,
+    size: f32,
+) {
+    parent.spawn(
+        NodeBundle {
+            style: Style {
+                size: Size::new(Val::Percent(size), Val::Percent(size)),
+                position_type: PositionType::Absolute,
+                position: UiRect {
+                    left: Val::Percent(left),
+                    top: Val::Percent(top),
+                    ..Default::default()
+                },
+                flex_direction: FlexDirection::Column,
+                justify_content: JustifyContent::FlexStart,
+                align_items: AlignItems::FlexStart,
+                ..Default::default()
+            }, background_color: Color::BLACK.into(),
+            ..Default::default()
+        }
+    ).with_children(
+        |parent| {
+            parent.spawn(
+                get_text_bundle(
+                    &character_type.to_string(),
+                    get_text_style(font.clone(), Color::WHITE, 20.0),
+                    JustifyContent::FlexStart,
+                    5.0,
+                )
+            );
+            initialize_gene_container(parent, font.clone(), character_type);
+            initialize_stat_container(parent, font.clone(), character_type, CharacterStatType::Energy, u8::MAX.to_string());
+            initialize_stat_container(parent, font.clone(), character_type, CharacterStatType::Health, u8::MAX.to_string());
+            initialize_stat_container(parent, font.clone(), character_type, CharacterStatType::Block, u8::MAX.to_string());
+            initialize_stat_container(parent, font.clone(), character_type, CharacterStatType::Statuses, u8::MAX.to_string());
+        }
+    );
+
+}
+
 fn initialize_gene_container(parent: &mut ChildBuilder, font: Handle<Font>, character_type: CharacterType) {
     parent.spawn(
         NodeBundle {
@@ -481,6 +408,24 @@ fn initialize_gene_container(parent: &mut ChildBuilder, font: Handle<Font>, char
             }
         }
     );
+}
+
+fn initialize_stat_container(
+    parent: &mut ChildBuilder,
+    font: Handle<Font>,
+    character_type: CharacterType,
+    stat_type: CharacterStatType,
+    initial_stat_value: String,
+) {
+    parent.spawn(
+        get_text_bundle(
+            "UNINITIALIED",
+            get_text_style(font.clone(), Color::WHITE, 20.0),
+            JustifyContent::FlexStart,
+            5.0,
+        )
+    ).insert(DisplayComponent::new(stat_type.to_string(), initial_stat_value))
+    .insert(CharacterStatComponent(character_type, stat_type));
 }
 
 fn render_gene_card(

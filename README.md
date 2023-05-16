@@ -138,9 +138,27 @@ State Machine that controls Game Phases:
 #### Drafting
 After each fight, we have the option of:
 - Choosing a gene from our fallen foe
+    -> Show the genes from our fallen foe (with hovertips if we know them)
+    -> Allow us to click one to be added to the end of our genome
+    -> Allow user to click through to continue
 - Moving one gene in our genome
+    -> Show our genome with hovertips
+    -> Allow us to click one, which gets highlighted
+    -> On hovering over a different gene, show the resulting potential move
+    -> On click, move it
+    -> Also can cancel by pressing escape or a cancel button
+    -> Allow user to click through to continue
 - Swapping two genes in our genome
+    -> Show our genome with hovertips
+    -> Allow us to click one, which gets highlighted
+    -> On hovering over a different gene, show the resulting potential swap
+    -> On click, swap them
+    -> Also can cancel by pressing escape or a cancel button
+    -> Allow user to click through to continue
 - Researching a symbol
+    -> Show all genes with the ones we already know grayed out
+    -> On click, show the hovertext for it
+    -> Allow user to click through to continue
 
 
 ## Enemies

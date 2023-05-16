@@ -28,12 +28,14 @@ impl Plugin for UIPlugin {
         app.add_plugin(EguiPlugin).add_systems((
             configure_visuals.in_schedule(OnEnter(NucleotideState::LoadingUI)),
             ui_load_system.in_schedule(OnEnter(NucleotideState::LoadingUI)),
+            initialize_battle_ui_system.in_schedule(OnEnter(NucleotideState::InitializingBattle)),
             render_system.run_if(in_state(NucleotideState::GeneAnimating)),
             display_state_system.run_if(get_battle_states_condition()),
             display_genome_system.run_if(get_battle_states_condition()),
             hover_over_gene_system
                 .run_if(get_battle_states_condition())
                 .after(display_genome_system),
+            select_battle_reward_ui_system.run_if(in_state(NucleotideState::SelectBattleReward)),
             paused_ui_system.run_if(in_state(NucleotideState::Paused)),
             game_over_ui_system.run_if(in_state(NucleotideState::GameOver)),
         ));
@@ -150,6 +152,11 @@ fn ui_load_system(mut commands: Commands, asset_server: Res<AssetServer>) {
 
     commands.spawn(Camera2dBundle::default());
 
+    commands.insert_resource(NextState(Some(NucleotideState::InstantiatingMeta)));
+}
+
+fn initialize_battle_ui_system(mut commands: Commands, loaded_font: Res<LoadedFont>) {
+    let font = loaded_font.0.clone();
     commands
         .spawn(NodeBundle {
             style: Style {
@@ -180,14 +187,28 @@ fn ui_load_system(mut commands: Commands, asset_server: Res<AssetServer>) {
 
             initialize_character_ui(parent, font.clone(), CharacterType::Enemy, 30.0, 0.0, 30.0);
         });
-
-    commands.insert_resource(NextState(Some(NucleotideState::InstantiatingMeta)));
 }
 
 fn battle_ui_system(mut egui_ctx: EguiContexts, query: Query<&Text>) {
     egui::TopBottomPanel::top("top_panel").show(egui_ctx.ctx_mut(), |ui| {
         ui.label("Nucleotide");
     });
+}
+
+fn select_battle_reward_ui_system(mut egui_ctx: EguiContexts, loaded_font: Res<LoadedFont>) {
+    egui::Area::new("select-battle-reward-menu")
+        .anchor(egui::Align2::CENTER_CENTER, egui::Vec2::ZERO)
+        .show(egui_ctx.ctx_mut(), |ui| {
+            ui.with_layout(egui::Layout::top_down(egui::Align::Center), |ui| {
+                ui.label(
+                    egui::RichText::new("Select Battle Reward")
+                        .size(20.)
+                        .text_style(egui::TextStyle::Heading)
+                        .underline()
+                        .color(egui::Color32::BLACK),
+                );
+            });
+        });
 }
 
 fn render_system(mut query: Query<(&DisplayComponent, &mut Text)>) {

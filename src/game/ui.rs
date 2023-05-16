@@ -1,16 +1,15 @@
 use bevy::ui::RelativeCursorPosition;
-use bevy::window::{PrimaryWindow, Cursor};
-use bevy::{prelude::*, asset::LoadState};
+use bevy::window::{Cursor, PrimaryWindow};
+use bevy::{asset::LoadState, prelude::*};
 use bevy_egui::{egui, EguiContexts, EguiPlugin};
 
-use crate::game::resources::*;
 use crate::game::constants::*;
+use crate::game::resources::*;
 
 pub struct UIPlugin;
 
 impl Plugin for UIPlugin {
     fn build(&self, app: &mut App) {
-
         let get_battle_states_condition = || {
             in_state(NucleotideState::Paused)
                 .or_else(in_state(NucleotideState::Paused))
@@ -24,20 +23,20 @@ impl Plugin for UIPlugin {
                 .or_else(in_state(NucleotideState::FinishedGeneCommandHandling))
                 .or_else(in_state(NucleotideState::EndOfTurn))
                 .or_else(in_state(NucleotideState::GeneAnimating))
-            };
+        };
 
-        app
-            .add_plugin(EguiPlugin)
-            .add_systems((
-                configure_visuals.in_schedule(OnEnter(NucleotideState::LoadingUI)),
-                ui_load_system.in_schedule(OnEnter(NucleotideState::LoadingUI)),
-                render_system.run_if(in_state(NucleotideState::GeneAnimating)),
-                display_state_system.run_if(get_battle_states_condition()),
-                display_genome_system.run_if(get_battle_states_condition()),
-                hover_over_gene_system.run_if(get_battle_states_condition()).after(display_genome_system),
-                paused_ui_system.run_if(in_state(NucleotideState::Paused)),
-                game_over_ui_system.run_if(in_state(NucleotideState::GameOver)),
-            ));
+        app.add_plugin(EguiPlugin).add_systems((
+            configure_visuals.in_schedule(OnEnter(NucleotideState::LoadingUI)),
+            ui_load_system.in_schedule(OnEnter(NucleotideState::LoadingUI)),
+            render_system.run_if(in_state(NucleotideState::GeneAnimating)),
+            display_state_system.run_if(get_battle_states_condition()),
+            display_genome_system.run_if(get_battle_states_condition()),
+            hover_over_gene_system
+                .run_if(get_battle_states_condition())
+                .after(display_genome_system),
+            paused_ui_system.run_if(in_state(NucleotideState::Paused)),
+            game_over_ui_system.run_if(in_state(NucleotideState::GameOver)),
+        ));
     }
 }
 
@@ -49,26 +48,17 @@ pub struct DisplayComponent {
 }
 
 impl DisplayComponent {
-
     pub fn new(prefix: String, value: String) -> Self {
-        Self {
-            prefix,
-            value,
-        }
+        Self { prefix, value }
     }
 
     pub fn new_with_u8_value(prefix: String, value: u8) -> Self {
-        Self::new(
-            prefix,
-            value.to_string(),
-        )
+        Self::new(prefix, value.to_string())
     }
 }
 
-
 #[derive(Component, Clone)]
 pub struct CharacterStatComponent(pub CharacterType, pub CharacterStatType);
-
 
 #[derive(Component, Clone)]
 pub struct GenomeDisplayComponent {
@@ -78,7 +68,6 @@ pub struct GenomeDisplayComponent {
 }
 
 impl GenomeDisplayComponent {
-
     pub fn new(character_type: CharacterType, gene: Option<(Symbol, bool)>, index: usize) -> Self {
         Self {
             character_type,
@@ -135,83 +124,64 @@ impl GenomeDisplayComponent {
         self.gene = None;
         self.clear_active();
     }
-
 }
 
 // End Components
 
 // Systems
 fn configure_visuals(mut ctx: EguiContexts) {
-    ctx.ctx_mut().set_visuals(
-        egui::Visuals {
-            window_rounding: 0.0.into(),
-            ..Default::default()
-        }
-    );
+    ctx.ctx_mut().set_visuals(egui::Visuals {
+        window_rounding: 0.0.into(),
+        ..Default::default()
+    });
 }
 
-fn ui_load_system(
-    mut commands: Commands,
-    asset_server: Res<AssetServer>,
-) {
-
+fn ui_load_system(mut commands: Commands, asset_server: Res<AssetServer>) {
     let font = asset_server.load("fonts/Roboto-Regular.ttf");
 
     if asset_server.get_load_state(font.clone()) == LoadState::Failed {
-        panic!("Failed to load font: {:?}", asset_server.get_load_state(font.clone()));
+        panic!(
+            "Failed to load font: {:?}",
+            asset_server.get_load_state(font.clone())
+        );
     }
 
     commands.insert_resource(LoadedFont(font.clone()));
 
-
     commands.spawn(Camera2dBundle::default());
 
-    commands.spawn(
-        NodeBundle {
+    commands
+        .spawn(NodeBundle {
             style: Style {
                 size: Size::new(Val::Percent(100.0), Val::Percent(100.0)),
                 position_type: PositionType::Absolute,
                 justify_content: JustifyContent::FlexStart,
                 align_items: AlignItems::FlexStart,
                 ..Default::default()
-            }, background_color: Color::NONE.into(),
+            },
+            background_color: Color::NONE.into(),
             ..Default::default()
-        }
-    ).with_children(
-        |parent| {
-            
+        })
+        .with_children(|parent| {
             // State
-            parent.spawn(
-                get_text_bundle(
+            parent
+                .spawn(get_text_bundle(
                     "State: Uninitialized",
                     get_text_style(font.clone(), Color::WHITE, 20.0),
                     JustifyContent::FlexStart,
                     5.0,
-                )
-            ).insert(DisplayComponent::new("State".to_string(), "Uninitialized".to_string()));
+                ))
+                .insert(DisplayComponent::new(
+                    "State".to_string(),
+                    "Uninitialized".to_string(),
+                ));
 
-            initialize_character_ui(
-                parent,
-                font.clone(),
-                CharacterType::Player,
-                0.0,
-                50.0,
-                50.0,
-            );
+            initialize_character_ui(parent, font.clone(), CharacterType::Player, 0.0, 50.0, 50.0);
 
-            initialize_character_ui(
-                parent,
-                font.clone(),
-                CharacterType::Enemy,
-                30.0,
-                0.0,
-                30.0,
-            );
-        }
-    );
+            initialize_character_ui(parent, font.clone(), CharacterType::Enemy, 30.0, 0.0, 30.0);
+        });
 
     commands.insert_resource(NextState(Some(NucleotideState::InstantiatingMeta)));
-
 }
 
 fn battle_ui_system(mut egui_ctx: EguiContexts, query: Query<&Text>) {
@@ -221,11 +191,13 @@ fn battle_ui_system(mut egui_ctx: EguiContexts, query: Query<&Text>) {
 }
 
 fn render_system(mut query: Query<(&DisplayComponent, &mut Text)>) {
-
     for (display, mut text) in &mut query {
-        text.sections[0].value = format!("{}: {}", display.prefix.to_string(), display.value.to_string());
+        text.sections[0].value = format!(
+            "{}: {}",
+            display.prefix.to_string(),
+            display.value.to_string()
+        );
     }
-
 }
 
 fn display_state_system(
@@ -245,8 +217,13 @@ fn display_state_system(
             match (character_acting.as_ref(), character_type_to_entity.as_ref()) {
                 (Some(character_acting), Some(character_type_to_entity)) => {
                     let acting = character_type_to_entity.get_character_type(character_acting.0);
-                    text.sections[0].value = format!("{}: {}\nCharacter Acting: {:?}", display.prefix.to_string(), suffix, acting);
-                },
+                    text.sections[0].value = format!(
+                        "{}: {}\nCharacter Acting: {:?}",
+                        display.prefix.to_string(),
+                        suffix,
+                        acting
+                    );
+                }
                 _ => {
                     text.sections[0].value = format!("{}: {}", display.prefix.to_string(), suffix);
                 }
@@ -255,12 +232,14 @@ fn display_state_system(
     }
 }
 
-fn display_genome_system(
-    mut query: Query<(&GenomeDisplayComponent, &mut Text)>,
-) {
+fn display_genome_system(mut query: Query<(&GenomeDisplayComponent, &mut Text)>) {
     for (display, mut text) in &mut query {
         text.sections[0].value = display.get_gene_symbol().unwrap_or(' ').to_string();
-        text.sections[0].style.color = if display.is_active() { Color::YELLOW_GREEN } else { Color::WHITE };
+        text.sections[0].style.color = if display.is_active() {
+            Color::YELLOW_GREEN
+        } else {
+            Color::WHITE
+        };
     }
 }
 
@@ -272,79 +251,53 @@ fn hover_over_gene_system(
     gene_specs: Res<GeneSpecs>,
     loaded_font: Res<LoadedFont>,
 ) {
-
     assert_eq!(window_query.iter().count(), 1);
     assert_eq!(camera_query.iter().count(), 1);
 
     for (gene_entity, display, relative_cursor_position) in &mut query {
         commands.entity(gene_entity).despawn_descendants();
         if relative_cursor_position.mouse_over() {
-            let gene_card_text = display.get_gene_symbol().and_then(
-                |symbol| gene_specs.0.get_card_from_symbol(symbol)
-            ).unwrap_or(" ".to_string());
-            commands.entity(gene_entity).with_children(
-                |parent| {
-                    render_gene_card(
-                        parent,
-                        gene_card_text,
-                        loaded_font.0.clone(),
-                    );
-                }
-            );
+            let gene_card_text = display
+                .get_gene_symbol()
+                .and_then(|symbol| gene_specs.0.get_card_from_symbol(symbol))
+                .unwrap_or(" ".to_string());
+            commands.entity(gene_entity).with_children(|parent| {
+                render_gene_card(parent, gene_card_text, loaded_font.0.clone());
+            });
         }
     }
-
-
-
 }
 
-fn paused_ui_system(
-    mut egui_ctx: EguiContexts,
-) {
+fn paused_ui_system(mut egui_ctx: EguiContexts) {
     egui::Area::new("pause-menu")
         .anchor(egui::Align2::CENTER_CENTER, egui::Vec2::ZERO)
-        .show(
-            egui_ctx.ctx_mut(), 
-            |ui| {
-                ui.with_layout(
-                    egui::Layout::top_down(egui::Align::Center), |ui| {
-                        ui.label(
-                            egui::RichText::new("Paused")
-                            .size(20.)
-                            .text_style(egui::TextStyle::Heading)
-                            .underline()
-                            .color(egui::Color32::BLACK)
-                        );
-
-                    }
+        .show(egui_ctx.ctx_mut(), |ui| {
+            ui.with_layout(egui::Layout::top_down(egui::Align::Center), |ui| {
+                ui.label(
+                    egui::RichText::new("Paused")
+                        .size(20.)
+                        .text_style(egui::TextStyle::Heading)
+                        .underline()
+                        .color(egui::Color32::BLACK),
                 );
-            }
-        );
+            });
+        });
 }
 
-
-fn game_over_ui_system(
-    mut egui_ctx: EguiContexts,
-) {
+fn game_over_ui_system(mut egui_ctx: EguiContexts) {
     egui::Area::new("game-over-menu")
         .anchor(egui::Align2::CENTER_CENTER, egui::Vec2::ZERO)
-        .show(
-            egui_ctx.ctx_mut(), 
-            |ui| {
-                ui.with_layout(
-                    egui::Layout::top_down(egui::Align::Center), |ui| {
-                        ui.label(
-                            egui::RichText::new("Game Over")
-                            .size(20.)
-                            .text_style(egui::TextStyle::Heading)
-                            .underline()
-                            .color(egui::Color32::BLACK)
-                        );
-
-                    }
+        .show(egui_ctx.ctx_mut(), |ui| {
+            ui.with_layout(egui::Layout::top_down(egui::Align::Center), |ui| {
+                ui.label(
+                    egui::RichText::new("Game Over")
+                        .size(20.)
+                        .text_style(egui::TextStyle::Heading)
+                        .underline()
+                        .color(egui::Color32::BLACK),
                 );
-            }
-        );
+            });
+        });
 }
 
 // Helper Functions
@@ -355,18 +308,14 @@ fn get_text_bundle(
     justify_content: JustifyContent,
     margin_width: f32,
 ) -> TextBundle {
-    TextBundle::from_section(
-        text.to_string(),
-        text_style
-    ).with_text_alignment(TextAlignment::Center)
-    .with_style(
-        Style {
+    TextBundle::from_section(text.to_string(), text_style)
+        .with_text_alignment(TextAlignment::Center)
+        .with_style(Style {
             align_self: AlignSelf::FlexStart,
             justify_content: justify_content,
             margin: UiRect::all(Val::Px(margin_width)),
             ..Default::default()
-        }
-    )
+        })
 }
 
 fn get_text_style(font: Handle<Font>, color: Color, font_size: f32) -> TextStyle {
@@ -385,8 +334,8 @@ fn initialize_character_ui(
     top: f32,
     size: f32,
 ) {
-    parent.spawn(
-        NodeBundle {
+    parent
+        .spawn(NodeBundle {
             style: Style {
                 size: Size::new(Val::Percent(size), Val::Percent(size)),
                 position_type: PositionType::Absolute,
@@ -399,32 +348,56 @@ fn initialize_character_ui(
                 justify_content: JustifyContent::FlexStart,
                 align_items: AlignItems::FlexStart,
                 ..Default::default()
-            }, background_color: Color::BLACK.into(),
+            },
+            background_color: Color::BLACK.into(),
             ..Default::default()
-        }
-    ).with_children(
-        |parent| {
-            parent.spawn(
-                get_text_bundle(
-                    &character_type.to_string(),
-                    get_text_style(font.clone(), Color::WHITE, 20.0),
-                    JustifyContent::FlexStart,
-                    5.0,
-                )
-            );
+        })
+        .with_children(|parent| {
+            parent.spawn(get_text_bundle(
+                &character_type.to_string(),
+                get_text_style(font.clone(), Color::WHITE, 20.0),
+                JustifyContent::FlexStart,
+                5.0,
+            ));
             initialize_gene_container(parent, font.clone(), character_type);
-            initialize_stat_container(parent, font.clone(), character_type, CharacterStatType::Energy, u8::MAX.to_string());
-            initialize_stat_container(parent, font.clone(), character_type, CharacterStatType::Health, u8::MAX.to_string());
-            initialize_stat_container(parent, font.clone(), character_type, CharacterStatType::Block, u8::MAX.to_string());
-            initialize_stat_container(parent, font.clone(), character_type, CharacterStatType::Statuses, u8::MAX.to_string());
-        }
-    );
-
+            initialize_stat_container(
+                parent,
+                font.clone(),
+                character_type,
+                CharacterStatType::Energy,
+                u8::MAX.to_string(),
+            );
+            initialize_stat_container(
+                parent,
+                font.clone(),
+                character_type,
+                CharacterStatType::Health,
+                u8::MAX.to_string(),
+            );
+            initialize_stat_container(
+                parent,
+                font.clone(),
+                character_type,
+                CharacterStatType::Block,
+                u8::MAX.to_string(),
+            );
+            initialize_stat_container(
+                parent,
+                font.clone(),
+                character_type,
+                CharacterStatType::Statuses,
+                u8::MAX.to_string(),
+            );
+        });
 }
 
-fn initialize_gene_container(parent: &mut ChildBuilder, font: Handle<Font>, character_type: CharacterType) {
-    parent.spawn(
-        NodeBundle {
+fn initialize_gene_container(
+    parent: &mut ChildBuilder,
+    font: Handle<Font>,
+    character_type: CharacterType,
+) {
+    parent
+        .spawn(NodeBundle {
             style: Style {
                 position_type: PositionType::Relative,
                 flex_direction: FlexDirection::Row,
@@ -433,22 +406,20 @@ fn initialize_gene_container(parent: &mut ChildBuilder, font: Handle<Font>, char
                 ..Default::default()
             },
             ..Default::default()
-        }
-    ).with_children(
-        |gene_container| {
+        })
+        .with_children(|gene_container| {
             for i in 0..GREEK_ALPHABET.len() {
-                gene_container.spawn(
-                    get_text_bundle(
+                gene_container
+                    .spawn(get_text_bundle(
                         &GREEK_ALPHABET[i].to_string(),
                         get_text_style(font.clone(), Color::WHITE, 20.0),
                         JustifyContent::FlexStart,
                         5.0,
-                    )
-                ).insert(RelativeCursorPosition::default())
-                .insert(GenomeDisplayComponent::new(character_type, None, i));
+                    ))
+                    .insert(RelativeCursorPosition::default())
+                    .insert(GenomeDisplayComponent::new(character_type, None, i));
             }
-        }
-    );
+        });
 }
 
 fn initialize_stat_container(
@@ -458,29 +429,30 @@ fn initialize_stat_container(
     stat_type: CharacterStatType,
     initial_stat_value: String,
 ) {
-    parent.spawn(
-        get_text_bundle(
-            "UNINITIALIED",
+    parent
+        .spawn(get_text_bundle(
+            "UNINITIALIZED",
             get_text_style(font.clone(), Color::WHITE, 20.0),
             JustifyContent::FlexStart,
             5.0,
-        )
-    ).insert(DisplayComponent::new(stat_type.to_string(), initial_stat_value))
-    .insert(CharacterStatComponent(character_type, stat_type));
+        ))
+        .insert(DisplayComponent::new(
+            stat_type.to_string(),
+            initial_stat_value,
+        ))
+        .insert(CharacterStatComponent(character_type, stat_type));
 }
 
-fn render_gene_card(
-    parent: &mut ChildBuilder,
-    display: String,
-    font: Handle<Font>,
-) {
+fn render_gene_card(parent: &mut ChildBuilder, display: String, font: Handle<Font>) {
     parent.spawn(
         get_text_bundle(
             &display.to_string(),
             get_text_style(font.clone(), Color::WHITE, 20.0),
             JustifyContent::FlexStart,
             0.0,
-        ).with_background_color(Color::DARK_GRAY)
+        )
+        .with_background_color(Color::DARK_GRAY),
     );
 }
 // End Helper Functions
+

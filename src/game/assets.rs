@@ -1,9 +1,9 @@
+use bevy::prelude::*;
 use std::fs;
 use std::path::Path;
-use bevy::{prelude::*};
 
-use crate::game::resources::*;
 use crate::game::constants::*;
+use crate::game::resources::*;
 
 use super::specs::EnemySpec;
 use super::specs::GeneCommand;
@@ -14,18 +14,16 @@ pub struct AssetsPlugin;
 
 impl Plugin for AssetsPlugin {
     fn build(&self, app: &mut App) {
-        app
-            .add_systems((
-                generate_example_specs_system.in_schedule(OnEnter(NucleotideState::LoadingAssets)),
-                load_assets_system.in_schedule(OnEnter(NucleotideState::LoadingAssets))
-            ));
+        app.add_systems((
+            generate_example_specs_system.in_schedule(OnEnter(NucleotideState::LoadingAssets)),
+            load_assets_system.in_schedule(OnEnter(NucleotideState::LoadingAssets)),
+        ));
     }
 }
 
 // Systems
 
 fn generate_example_specs_system() {
-
     let enemy_spec = EnemySpec::new(
         "Example Enemy".to_string(),
         100,
@@ -40,33 +38,47 @@ fn generate_example_specs_system() {
         vec![GeneCommand::Damage(10), GeneCommand::ReverseGeneProcessing],
     );
 
-    let enemy_spec_string = serde_json::to_string(&enemy_spec).expect("Error serializing enemy spec");
+    let enemy_spec_string =
+        serde_json::to_string(&enemy_spec).expect("Error serializing enemy spec");
     let gene_spec_string = serde_json::to_string(&gene_spec).expect("Error serializing gene spec");
 
-    fs::write(Path::new(ENEMY_SPEC_DIRECTORY).join("example_enemy.json"), enemy_spec_string).expect("Error writing enemy spec");
-    fs::write(Path::new(GENE_SPEC_DIRECTORY).join("example_gene.json"), gene_spec_string).expect("Error writing gene spec");
+    fs::write(
+        Path::new(ENEMY_SPEC_DIRECTORY).join("example_enemy.json"),
+        enemy_spec_string,
+    )
+    .expect("Error writing enemy spec");
+    fs::write(
+        Path::new(GENE_SPEC_DIRECTORY).join("example_gene.json"),
+        gene_spec_string,
+    )
+    .expect("Error writing gene spec");
 }
 
 fn load_assets_system(mut commands: Commands) {
-
-    let enemies = read_files_from_directory(Path::new(ENEMY_SPEC_DIRECTORY)).into_iter()
+    let enemies = read_files_from_directory(Path::new(ENEMY_SPEC_DIRECTORY))
+        .into_iter()
         .filter(|s| s.len() > 0)
         .map(|s| serde_json::from_str(&s))
-        .collect::<Result<Vec<EnemySpec>, _>>().expect("Error parsing enemy specs");
+        .collect::<Result<Vec<EnemySpec>, _>>()
+        .expect("Error parsing enemy specs");
 
-    let genes = read_files_from_directory(Path::new(GENE_SPEC_DIRECTORY)).into_iter()
+    let genes = read_files_from_directory(Path::new(GENE_SPEC_DIRECTORY))
+        .into_iter()
         .filter(|s| s.len() > 0)
         .map(|s| serde_json::from_str(&s))
-        .collect::<Result<Vec<GeneSpec>, _>>().expect("Error parsing gene specs");
+        .collect::<Result<Vec<GeneSpec>, _>>()
+        .expect("Error parsing gene specs");
 
-    let enemy_specs = enemies.into_iter()
+    let enemy_specs = enemies
+        .into_iter()
         .map(|s| (s.get_name().clone(), s))
         .filter(|(name, _spec)| !name.to_lowercase().contains("example"))
         .collect();
     let gene_spec_lookup = GeneSpecLookup::from_specs(
-        genes.into_iter()
-        .filter(|s| !s.get_name().to_lowercase().contains("example"))
-        .collect()
+        genes
+            .into_iter()
+            .filter(|s| !s.get_name().to_lowercase().contains("example"))
+            .collect(),
     );
 
     commands.insert_resource(EnemySpecs(enemy_specs));
@@ -93,19 +105,19 @@ fn read_files_from_directory(directory: &Path) -> Vec<String> {
                             match contents_result {
                                 Ok(contents) => {
                                     to_return.push(contents);
-                                },
+                                }
                                 Err(e) => {
                                     panic!("Error reading file: {}", e);
                                 }
                             }
                         }
-                    },
+                    }
                     Err(e) => {
                         panic!("Error reading subpath: {}", e);
                     }
                 }
             }
-        },
+        }
         Err(e) => {
             panic!("Error reading directory: {}", e);
         }
@@ -115,3 +127,4 @@ fn read_files_from_directory(directory: &Path) -> Vec<String> {
 }
 
 // End Helper Functions
+

@@ -7,11 +7,11 @@ use game::meta::MetaPlugin;
 use game::pause::PausePlugin;
 
 use crate::game::battle::BattlePlugin;
-use crate::game::ui::UIPlugin;
 use crate::game::resources::*;
+use crate::game::ui::UIPlugin;
 
 fn main() {
-    App::new()    
+    App::new()
         .add_plugins(DefaultPlugins)
         .add_state::<NucleotideState>()
         .add_plugin(AssetsPlugin)

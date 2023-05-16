@@ -279,7 +279,7 @@ fn handle_damage_system(
                     CharacterType::Enemy => queue_next_state_if_not_already_queued(
                         current_state.0,
                         &mut next_state,
-                        NucleotideState::BattleVictory,
+                        NucleotideState::SelectBattleReward,
                     ),
                 }
             }
@@ -660,4 +660,3 @@ fn queue_next_state_if_not_already_queued(
 }
 
 // End Helper Functions
-

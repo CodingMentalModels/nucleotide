@@ -1,11 +1,11 @@
-use std::collections::{BTreeMap};
+use std::collections::BTreeMap;
 
-use bevy::{prelude::*};
+use bevy::prelude::*;
 
-use crate::game::specs::GeneCommand;
 use crate::game::constants::*;
+use crate::game::specs::GeneCommand;
 
-use super::specs::{EnemySpec, GeneSpec, GeneName, EnemyName};
+use super::specs::{EnemyName, EnemySpec, GeneName, GeneSpec};
 
 pub type Symbol = char;
 
@@ -29,17 +29,15 @@ pub enum NucleotideState {
     FinishedGeneCommandHandling,
     EndOfTurn,
     GeneAnimating,
-    BattleVictory,
+    SelectBattleReward,
     GameOver,
     Victory,
 }
-
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash, Resource)]
 pub struct EnemyQueue(pub Vec<EnemyName>);
 
 impl EnemyQueue {
-
     pub fn pop(&mut self) -> Option<EnemyName> {
         self.0.pop()
     }
@@ -54,7 +52,6 @@ pub struct Player {
 }
 
 impl Player {
-
     pub fn new(name: String, health: u8, energy: u8, genome: Vec<GeneName>) -> Self {
         Self {
             name,
@@ -79,9 +76,7 @@ impl Player {
     pub fn get_genome(&self) -> Vec<GeneName> {
         self.genome.clone()
     }
-
 }
-
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash, Resource)]
 pub struct CharacterActing(pub Entity);
@@ -93,15 +88,15 @@ pub struct GeneCommandQueue(pub Vec<(GeneCommand, Entity)>);
 pub struct EnemySpecs(pub BTreeMap<String, EnemySpec>);
 
 impl EnemySpecs {
-
     pub fn get(&self, enemy_name: EnemyName) -> &EnemySpec {
-        self.0.get(&enemy_name.to_string()).expect("All enemy names should be registered when get() is called")
+        self.0
+            .get(&enemy_name.to_string())
+            .expect("All enemy names should be registered when get() is called")
     }
 
     pub fn get_names(&self) -> Vec<EnemyName> {
         self.0.keys().map(|s| s.clone()).collect()
     }
-
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash, Resource)]
@@ -111,14 +106,19 @@ pub struct GeneSpecs(pub GeneSpecLookup);
 pub struct CharacterTypeToEntity(pub Vec<(CharacterType, Entity)>);
 
 impl CharacterTypeToEntity {
-
     pub fn get(&self, character_type: CharacterType) -> Entity {
-        self.0.iter().find(|(ct, _)| *ct == character_type).map(|(_, e)| *e)
+        self.0
+            .iter()
+            .find(|(ct, _)| *ct == character_type)
+            .map(|(_, e)| *e)
             .expect("All character types should be registered when get() is called")
     }
 
     pub fn get_character_type(&self, entity: Entity) -> CharacterType {
-        self.0.iter().find(|(_, e)| *e == entity).map(|(ct, _)| *ct)
+        self.0
+            .iter()
+            .find(|(_, e)| *e == entity)
+            .map(|(ct, _)| *ct)
             .expect("All entities should be registered when get_character_type() is called")
     }
 
@@ -131,7 +131,6 @@ impl CharacterTypeToEntity {
     pub fn get_all(&self) -> Vec<Entity> {
         self.0.iter().map(|(_, e)| *e).collect()
     }
-
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
@@ -141,16 +140,14 @@ pub enum CharacterType {
 }
 
 impl CharacterType {
-
     pub fn to_string(&self) -> String {
         match self {
             Self::Player => "Player",
             Self::Enemy => "Enemy",
-        }.to_string()
+        }
+        .to_string()
     }
-
 }
-
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub enum CharacterStatType {
@@ -161,17 +158,16 @@ pub enum CharacterStatType {
 }
 
 impl CharacterStatType {
-
     pub fn to_string(&self) -> String {
         match self {
             Self::Health => "Health",
             Self::Block => "Block",
             Self::Energy => "Energy",
             Self::Statuses => "Statuses",
-        }.to_string()
+        }
+        .to_string()
     }
 }
-
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub struct GeneSpecLookup {
@@ -181,11 +177,20 @@ pub struct GeneSpecLookup {
 }
 
 impl GeneSpecLookup {
-
     pub fn from_specs(gene_specs: Vec<GeneSpec>) -> Self {
-        let name_to_spec = gene_specs.iter().map(|spec| (spec.get_name().clone(), spec.clone())).collect();
-        let symbol_to_name: BTreeMap<Symbol, String> = gene_specs.iter().enumerate().map(|(i, spec)| (GREEK_ALPHABET[i], spec.get_name().clone())).collect();
-        let name_to_symbol = symbol_to_name.iter().map(|(s, n)| (n.clone(), *s)).collect();
+        let name_to_spec = gene_specs
+            .iter()
+            .map(|spec| (spec.get_name().clone(), spec.clone()))
+            .collect();
+        let symbol_to_name: BTreeMap<Symbol, String> = gene_specs
+            .iter()
+            .enumerate()
+            .map(|(i, spec)| (GREEK_ALPHABET[i], spec.get_name().clone()))
+            .collect();
+        let name_to_symbol = symbol_to_name
+            .iter()
+            .map(|(s, n)| (n.clone(), *s))
+            .collect();
         Self {
             name_to_spec,
             symbol_to_name,
@@ -196,9 +201,11 @@ impl GeneSpecLookup {
     pub fn get_spec_from_name(&self, name: &str) -> Option<&GeneSpec> {
         self.name_to_spec.get(name)
     }
-    
+
     pub fn get_spec_from_symbol(&self, symbol: Symbol) -> Option<&GeneSpec> {
-        self.symbol_to_name.get(&symbol).and_then(|name| self.name_to_spec.get(name))
+        self.symbol_to_name
+            .get(&symbol)
+            .and_then(|name| self.name_to_spec.get(name))
     }
 
     pub fn get_name_from_symbol(&self, symbol: Symbol) -> Option<&String> {
@@ -216,11 +223,11 @@ impl GeneSpecLookup {
     }
 
     pub fn get_text_from_symbol(&self, symbol: Symbol) -> Option<String> {
-        self.get_spec_from_symbol(symbol).map(|spec| spec.get_text())
+        self.get_spec_from_symbol(symbol)
+            .map(|spec| spec.get_text())
     }
-
 }
-
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash, Resource)]
 pub struct LoadedFont(pub Handle<Font>);
+

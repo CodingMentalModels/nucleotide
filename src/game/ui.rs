@@ -455,4 +455,3 @@ fn render_gene_card(parent: &mut ChildBuilder, display: String, font: Handle<Fon
     );
 }
 // End Helper Functions
-

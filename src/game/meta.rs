@@ -1,8 +1,8 @@
-use bevy::{prelude::*};
+use bevy::prelude::*;
 
 use crate::game::resources::*;
 
-use super::constants::{STARTING_PLAYER_HEALTH, STARTING_PLAYER_ENERGY};
+use super::constants::{STARTING_PLAYER_ENERGY, STARTING_PLAYER_HEALTH};
 
 pub struct MetaPlugin;
 
@@ -16,23 +16,18 @@ impl Plugin for MetaPlugin {
 
 // Components
 
-
 // End Components
 
 // Systems
 
-fn instantiate_meta_system(
-    mut commands: Commands,
-    enemy_specs: Res<EnemySpecs>,
-) {
-
+fn instantiate_meta_system(mut commands: Commands, enemy_specs: Res<EnemySpecs>) {
     let player_genome = vec![
         "Sting".to_string(),
         "Repeat Codon".to_string(),
         "Block".to_string(),
         "Reverse Codon".to_string(),
         "Stomp".to_string(),
-        ];
+    ];
     let player = Player::new(
         "Player".to_string(),
         STARTING_PLAYER_HEALTH,
@@ -49,3 +44,4 @@ fn instantiate_meta_system(
 }
 
 // End Systems
+

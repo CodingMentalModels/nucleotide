@@ -230,4 +230,3 @@ impl GeneSpecLookup {
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash, Resource)]
 pub struct LoadedFont(pub Handle<Font>);
-

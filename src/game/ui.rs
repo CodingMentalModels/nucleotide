@@ -6,6 +6,8 @@ use bevy_egui::{egui, EguiContexts, EguiPlugin};
 use crate::game::constants::*;
 use crate::game::resources::*;
 
+use super::ui_state::{GenomeUIState, InBattleUIState, UIState};
+
 pub struct UIPlugin;
 
 impl Plugin for UIPlugin {
@@ -62,72 +64,6 @@ impl DisplayComponent {
 #[derive(Component, Clone)]
 pub struct CharacterStatComponent(pub CharacterType, pub CharacterStatType);
 
-#[derive(Component, Clone)]
-pub struct GenomeDisplayComponent {
-    character_type: CharacterType,
-    gene: Option<(Symbol, bool)>,
-    index: usize,
-}
-
-impl GenomeDisplayComponent {
-    pub fn new(character_type: CharacterType, gene: Option<(Symbol, bool)>, index: usize) -> Self {
-        Self {
-            character_type,
-            gene,
-            index,
-        }
-    }
-
-    pub fn get_character_type(&self) -> CharacterType {
-        self.character_type
-    }
-
-    pub fn get_gene_symbol(&self) -> Option<Symbol> {
-        self.gene.map(|(symbol, _)| symbol)
-    }
-
-    pub fn set_gene_symbol(&mut self, gene: Symbol) {
-        self.gene = Some((gene, false));
-    }
-
-    pub fn maybe_set_gene_symbol(&mut self, maybe_gene_symbol: Option<Symbol>) {
-        match maybe_gene_symbol {
-            Some(gene) => self.set_gene_symbol(gene),
-            None => self.clear(),
-        }
-    }
-
-    pub fn get_index(&self) -> usize {
-        self.index
-    }
-
-    pub fn is_active(&self) -> bool {
-        match self.gene {
-            Some((_, is_active)) => is_active,
-            None => false,
-        }
-    }
-
-    pub fn set_active(&mut self) {
-        match self.gene {
-            Some((symbol, _)) => self.gene = Some((symbol, true)),
-            None => (),
-        }
-    }
-
-    pub fn clear_active(&mut self) {
-        match self.gene {
-            Some((symbol, _)) => self.gene = Some((symbol, false)),
-            None => (),
-        }
-    }
-
-    pub fn clear(&mut self) {
-        self.gene = None;
-        self.clear_active();
-    }
-}
-
 // End Components
 
 // Systems
@@ -152,6 +88,7 @@ fn ui_load_system(mut commands: Commands, asset_server: Res<AssetServer>) {
 
     commands.spawn(Camera2dBundle::default());
 
+    commands.insert_resource(UIState(InBattleUIState::default()));
     commands.insert_resource(NextState(Some(NucleotideState::InstantiatingMeta)));
 }
 
@@ -253,7 +190,7 @@ fn display_state_system(
     }
 }
 
-fn display_genome_system(mut query: Query<(&GenomeDisplayComponent, &mut Text)>) {
+fn display_genome_system(mut query: Query<(&GenomeUIState, &mut Text)>) {
     for (display, mut text) in &mut query {
         text.sections[0].value = display.get_gene_symbol().unwrap_or(' ').to_string();
         text.sections[0].style.color = if display.is_active() {
@@ -266,7 +203,7 @@ fn display_genome_system(mut query: Query<(&GenomeDisplayComponent, &mut Text)>)
 
 fn hover_over_gene_system(
     mut commands: Commands,
-    mut query: Query<(Entity, &GenomeDisplayComponent, &RelativeCursorPosition)>,
+    mut query: Query<(Entity, &GenomeUIState, &RelativeCursorPosition)>,
     window_query: Query<&Window>,
     camera_query: Query<(&Camera, &GlobalTransform)>,
     gene_specs: Res<GeneSpecs>,
@@ -438,7 +375,7 @@ fn initialize_gene_container(
                         5.0,
                     ))
                     .insert(RelativeCursorPosition::default())
-                    .insert(GenomeDisplayComponent::new(character_type, None, i));
+                    .insert(GenomeUIState::new(character_type, None, i));
             }
         });
 }

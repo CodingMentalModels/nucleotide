@@ -6,8 +6,10 @@ use super::{
     specs::{GeneSpec, StatusEffect},
 };
 
-#[derive(Debug, Clone, PartialEq, Eq, Hash, Resource)]
+#[derive(Debug, Clone, PartialEq, Default, Eq, Hash, Resource)]
 pub enum UIState {
+    #[default]
+    Loading,
     InBattle(InBattleUIState),
     SelectBattleReward(RewardUIState),
     Paused(PausedUIState),
@@ -42,12 +44,12 @@ impl InBattleUIState {
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub struct CharacterUIState {
-    energy_remaining: u8,
-    total_energy: u8,
-    health: u8,
-    block: u8,
-    status_effects: Vec<(StatusEffect, u8)>,
-    genome: GenomeUIState,
+    pub energy_remaining: u8,
+    pub total_energy: u8,
+    pub health: u8,
+    pub block: u8,
+    pub status_effects: Vec<(StatusEffect, u8)>,
+    pub genome: GenomeUIState,
 }
 
 impl CharacterUIState {
@@ -57,7 +59,7 @@ impl CharacterUIState {
         health: u8,
         block: u8,
         status_effects: Vec<(StatusEffect, u8)>,
-        genome: Vec<GeneUIState>,
+        genome: GenomeUIState,
     ) -> Self {
         Self {
             energy_remaining,
@@ -78,7 +80,7 @@ impl CharacterUIState {
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub struct GenomeUIState {
-    genes: Vec<GeneUIState>,
+    pub genes: Vec<GeneUIState>,
 }
 
 impl GenomeUIState {
@@ -93,9 +95,9 @@ impl GenomeUIState {
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub struct GeneUIState {
-    gene: Symbol,
-    is_active: bool,
-    hovertext: String,
+    pub gene: Symbol,
+    pub is_active: bool,
+    pub hovertext: String,
 }
 
 impl GeneUIState {

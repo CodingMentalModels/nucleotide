@@ -1,5 +1,3 @@
-use bevy::ui::RelativeCursorPosition;
-use bevy::window::{Cursor, PrimaryWindow};
 use bevy::{asset::LoadState, prelude::*};
 use bevy_egui::{egui, EguiContexts, EguiPlugin};
 use egui::{RichText, Ui};

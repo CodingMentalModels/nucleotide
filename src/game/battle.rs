@@ -10,6 +10,7 @@ use super::specs::StatusEffect;
 use super::specs::{GeneCommand, TargetType};
 use super::ui_state::CharacterUIState;
 use super::ui_state::GeneUIState;
+use super::ui_state::GenomeUIState;
 use super::ui_state::UIState;
 
 pub type TargetEntity = Entity;
@@ -363,50 +364,51 @@ fn render_character_display_system(
     gene_specs: Res<GeneSpecs>,
 ) {
     for (entity, health, block, energy, status_effects, genome) in character_display_query.iter() {
-        if character_type_to_entity_map.is_player_character(entity) {
-            match *ui_state {
+        let mut new_ui_state = ui_state.clone();
+        if character_type_to_entity_map.is_player(entity) {
+            match new_ui_state {
                 UIState::InBattle(mut s) => {
                     s.player_character_state = CharacterUIState::new(
                         energy.energy_remaining,
                         energy.starting_energy,
                         health.0,
                         block.0,
-                        status_effects.0,
-                        GeneUIState::from(genome),
+                        status_effects.0.clone(),
+                        GenomeUIState::from_genome(genome, &gene_specs.0),
                     )
                 }
                 e => panic!("Invalid UI State: {:?}", e),
             }
-        } else if character_type_to_entity_map.is_enemy_character(entity) {
-            match *ui_state {
+        } else if character_type_to_entity_map.is_enemy(entity) {
+            match new_ui_state {
                 UIState::InBattle(mut s) => {
                     s.enemy_character_state = CharacterUIState::new(
                         energy.energy_remaining,
                         energy.starting_energy,
                         health.0,
                         block.0,
-                        status_effects.0,
-                        GeneUIState::from(genome),
+                        status_effects.0.clone(),
+                        GenomeUIState::from_genome(genome, &gene_specs.0),
                     )
                 }
                 e => panic!("Invalid UI State: {:?}", e),
             }
         }
+        *ui_state = new_ui_state;
     }
 }
 
 fn render_genome_system(
     character_query: Query<(Entity, &GenomeComponent)>,
-    mut ui_state: ResMut<UIState>,
+    ui_state: ResMut<UIState>,
     gene_specs: Res<GeneSpecs>,
     character_type_to_entity_map: Res<CharacterTypeToEntity>,
 ) {
     for (entity, genome) in character_query.iter() {
         let character_type = character_type_to_entity_map.get_character_type(entity);
-        match ui_state {
+        match *ui_state {
             UIState::InBattle(mut battle_ui_state) => {
-                let gene_spec_lookup = gene_specs.0;
-                battle_ui_state.update_genome(character_type, genome, gene_spec_lookup);
+                battle_ui_state.update_genome(character_type, genome, &gene_specs.0);
             }
             _ => panic!(
                 "Invalid UI State -- should be in battle but was {:?}",
@@ -463,15 +465,20 @@ impl GenomeComponent {
         Self::new(genes, 0, GeneProcessingOrder::Forward, 0)
     }
 
-    pub fn get_gene_ui_states(&self, gene_spec_lookup: GeneSpecLookup) -> Vec<GeneUIState> {
+    pub fn get_gene_ui_states(&self, gene_spec_lookup: &GeneSpecLookup) -> Vec<GeneUIState> {
         self.genes
             .iter()
             .enumerate()
-            .map(|i, gene| {
+            .map(|(i, gene)| {
+                let symbol = gene_spec_lookup
+                    .get_symbol_from_name(gene)
+                    .expect("All genes should have a valid symbol.");
                 GeneUIState::new(
-                    gene_spec_lookup.get_symbol_from_name(gene),
+                    symbol,
                     (i == self.get_pointer()),
-                    gene_spec_lookup.get_text(),
+                    gene_spec_lookup
+                        .get_card_from_symbol(symbol)
+                        .expect("All genes should have a valid symbol."),
                 )
             })
             .collect()
@@ -519,7 +526,7 @@ impl GenomeComponent {
         self.repeat_gene += 1;
     }
 
-    pub fn get_pointer(&self) {
+    pub fn get_pointer(&self) -> usize {
         self.pointer
     }
 }

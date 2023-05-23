@@ -131,6 +131,14 @@ impl CharacterTypeToEntity {
     pub fn get_all(&self) -> Vec<Entity> {
         self.0.iter().map(|(_, e)| *e).collect()
     }
+
+    pub fn is_player(&self, entity: Entity) -> bool {
+        self.get_character_type(entity) == CharacterType::Player
+    }
+
+    pub fn is_enemy(&self, entity: Entity) -> bool {
+        self.get_character_type(entity) == CharacterType::Enemy
+    }
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]

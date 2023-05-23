@@ -3,7 +3,7 @@ use bevy::prelude::*;
 use super::{
     battle::GenomeComponent,
     resources::{CharacterType, GeneSpecLookup, NucleotideState, Symbol},
-    specs::{GeneSpec, StatusEffect},
+    specs::StatusEffect,
 };
 
 #[derive(Debug, Clone, PartialEq, Default, Eq, Hash, Resource)]
@@ -28,8 +28,8 @@ impl InBattleUIState {
     pub fn update_genome(
         &mut self,
         character_type: CharacterType,
-        genome: GenomeComponent,
-        gene_spec_lookup: GeneSpecLookup,
+        genome: &GenomeComponent,
+        gene_spec_lookup: &GeneSpecLookup,
     ) {
         match character_type {
             CharacterType::Player => self
@@ -73,7 +73,7 @@ impl CharacterUIState {
 }
 
 impl CharacterUIState {
-    pub fn update_genome(&mut self, genome: GenomeComponent, gene_spec_lookup: GeneSpecLookup) {
+    pub fn update_genome(&mut self, genome: &GenomeComponent, gene_spec_lookup: &GeneSpecLookup) {
         self.genome = GenomeUIState::from_genome(genome, gene_spec_lookup);
     }
 }
@@ -88,7 +88,7 @@ impl GenomeUIState {
         Self { genes }
     }
 
-    pub fn from_genome(genome: GenomeComponent, gene_spec_lookup: GeneSpecLookup) -> Self {
+    pub fn from_genome(genome: &GenomeComponent, gene_spec_lookup: &GeneSpecLookup) -> Self {
         Self::new(genome.get_gene_ui_states(gene_spec_lookup))
     }
 }
@@ -110,11 +110,11 @@ impl GeneUIState {
     }
 
     pub fn get_gene_symbol(&self) -> Symbol {
-        self.symbol
+        self.gene
     }
 
     pub fn set_gene_symbol(&mut self, gene: Symbol) {
-        self.symbol = gene;
+        self.gene = gene;
     }
 }
 

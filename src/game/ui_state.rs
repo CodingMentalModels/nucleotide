@@ -6,18 +6,10 @@ use super::{
     specs::StatusEffect,
 };
 
-#[derive(Debug, Clone, PartialEq, Default, Eq, Hash, Resource)]
-pub enum UIState {
-    #[default]
-    Loading,
-    InBattle(InBattleUIState),
-    SelectBattleReward(RewardUIState),
-    Paused(PausedUIState),
-    GameOver(GameOverUIState),
-    Victory(VictoryUIState),
-}
+#[derive(Debug, Default, Clone, PartialEq, Eq, Hash, Resource)]
+pub struct InitializingBattleUIState;
 
-#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+#[derive(Debug, Clone, PartialEq, Eq, Hash, Resource)]
 pub struct InBattleUIState {
     pub nucleotide_state: NucleotideState,
     pub player_character_state: CharacterUIState,
@@ -38,6 +30,13 @@ impl InBattleUIState {
             CharacterType::Enemy => self
                 .enemy_character_state
                 .update_genome(genome, gene_spec_lookup),
+        }
+    }
+
+    pub fn get_character_state(&self, character_type: CharacterType) -> CharacterUIState {
+        match character_type {
+            CharacterType::Player => self.player_character_state.clone(),
+            CharacterType::Enemy => self.enemy_character_state.clone(),
         }
     }
 }
@@ -70,9 +69,7 @@ impl CharacterUIState {
             genome,
         }
     }
-}
 
-impl CharacterUIState {
     pub fn update_genome(&mut self, genome: &GenomeComponent, gene_spec_lookup: &GeneSpecLookup) {
         self.genome = GenomeUIState::from_genome(genome, gene_spec_lookup);
     }
@@ -118,14 +115,14 @@ impl GeneUIState {
     }
 }
 
-#[derive(Debug, Default, Clone, PartialEq, Eq, Hash)]
+#[derive(Debug, Default, Clone, PartialEq, Eq, Hash, Resource)]
 pub struct PausedUIState;
 
-#[derive(Debug, Default, Clone, PartialEq, Eq, Hash)]
-pub struct RewardUIState;
+#[derive(Debug, Default, Clone, PartialEq, Eq, Hash, Resource)]
+pub struct SelectBattleRewardUIState;
 
-#[derive(Debug, Default, Clone, PartialEq, Eq, Hash)]
+#[derive(Debug, Default, Clone, PartialEq, Eq, Hash, Resource)]
 pub struct GameOverUIState;
 
-#[derive(Debug, Default, Clone, PartialEq, Eq, Hash)]
+#[derive(Debug, Default, Clone, PartialEq, Eq, Hash, Resource)]
 pub struct VictoryUIState;

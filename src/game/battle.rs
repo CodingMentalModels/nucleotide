@@ -11,7 +11,7 @@ use super::specs::{GeneCommand, TargetType};
 use super::ui_state::CharacterUIState;
 use super::ui_state::GeneUIState;
 use super::ui_state::GenomeUIState;
-use super::ui_state::UIState;
+use super::ui_state::InBattleUIState;
 
 pub type TargetEntity = Entity;
 
@@ -359,62 +359,42 @@ fn render_character_display_system(
         &StatusEffectComponent,
         &GenomeComponent,
     )>,
-    mut ui_state: ResMut<UIState>,
+    mut ui_state: ResMut<InBattleUIState>,
     character_type_to_entity_map: Res<CharacterTypeToEntity>,
     gene_specs: Res<GeneSpecs>,
 ) {
     for (entity, health, block, energy, status_effects, genome) in character_display_query.iter() {
-        let mut new_ui_state = ui_state.clone();
         if character_type_to_entity_map.is_player(entity) {
-            match new_ui_state {
-                UIState::InBattle(mut s) => {
-                    s.player_character_state = CharacterUIState::new(
-                        energy.energy_remaining,
-                        energy.starting_energy,
-                        health.0,
-                        block.0,
-                        status_effects.0.clone(),
-                        GenomeUIState::from_genome(genome, &gene_specs.0),
-                    )
-                }
-                e => panic!("Invalid UI State: {:?}", e),
-            }
+            ui_state.player_character_state = CharacterUIState::new(
+                energy.energy_remaining,
+                energy.starting_energy,
+                health.0,
+                block.0,
+                status_effects.0.clone(),
+                GenomeUIState::from_genome(genome, &gene_specs.0),
+            )
         } else if character_type_to_entity_map.is_enemy(entity) {
-            match new_ui_state {
-                UIState::InBattle(mut s) => {
-                    s.enemy_character_state = CharacterUIState::new(
-                        energy.energy_remaining,
-                        energy.starting_energy,
-                        health.0,
-                        block.0,
-                        status_effects.0.clone(),
-                        GenomeUIState::from_genome(genome, &gene_specs.0),
-                    )
-                }
-                e => panic!("Invalid UI State: {:?}", e),
-            }
+            ui_state.enemy_character_state = CharacterUIState::new(
+                energy.energy_remaining,
+                energy.starting_energy,
+                health.0,
+                block.0,
+                status_effects.0.clone(),
+                GenomeUIState::from_genome(genome, &gene_specs.0),
+            )
         }
-        *ui_state = new_ui_state;
     }
 }
 
 fn render_genome_system(
     character_query: Query<(Entity, &GenomeComponent)>,
-    ui_state: ResMut<UIState>,
+    mut ui_state: ResMut<InBattleUIState>,
     gene_specs: Res<GeneSpecs>,
     character_type_to_entity_map: Res<CharacterTypeToEntity>,
 ) {
     for (entity, genome) in character_query.iter() {
         let character_type = character_type_to_entity_map.get_character_type(entity);
-        match *ui_state {
-            UIState::InBattle(mut battle_ui_state) => {
-                battle_ui_state.update_genome(character_type, genome, &gene_specs.0);
-            }
-            _ => panic!(
-                "Invalid UI State -- should be in battle but was {:?}",
-                ui_state
-            ),
-        }
+        ui_state.update_genome(character_type, genome, &gene_specs.0);
     }
 }
 

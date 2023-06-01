@@ -5,19 +5,37 @@ use egui::{RichText, Ui};
 use crate::game::constants::*;
 use crate::game::resources::*;
 
+use super::ui_state::InitializingBattleUIState;
 use super::ui_state::{
     CharacterUIState, GameOverUIState, GenomeUIState, InBattleUIState, PausedUIState,
-    RewardUIState, UIState,
+    SelectBattleRewardUIState,
 };
 
 pub struct UIPlugin;
 
 impl Plugin for UIPlugin {
     fn build(&self, app: &mut App) {
+        let get_battle_states_condition = || {
+            in_state(NucleotideState::Paused)
+                .or_else(in_state(NucleotideState::CharacterActing))
+                .or_else(in_state(NucleotideState::StartOfTurn))
+                .or_else(in_state(NucleotideState::GeneLoading))
+                .or_else(in_state(NucleotideState::GeneCommandHandling))
+                .or_else(in_state(NucleotideState::FinishedGeneCommandHandling))
+                .or_else(in_state(NucleotideState::EndOfTurn))
+                .or_else(in_state(NucleotideState::GeneAnimating))
+        };
+
+        let or_paused_condition =
+            |state: NucleotideState| in_state(NucleotideState::Paused).or_else(in_state(state));
+
         app.add_plugin(EguiPlugin).add_systems((
             configure_visuals.in_schedule(OnEnter(NucleotideState::LoadingUI)),
             ui_load_system.in_schedule(OnEnter(NucleotideState::LoadingUI)),
-            render_system.run_if(in_state(NucleotideState::GeneAnimating)),
+            render_initializing_battle_system.run_if(in_state(NucleotideState::InitializingBattle)),
+            render_battle_system.run_if(get_battle_states_condition()),
+            render_paused_system.run_if(in_state(NucleotideState::Paused)),
+            render_select_reward_system.run_if(in_state(NucleotideState::SelectBattleReward)),
         ));
     }
 }
@@ -44,48 +62,40 @@ fn ui_load_system(mut commands: Commands, asset_server: Res<AssetServer>) {
 
     commands.spawn(Camera2dBundle::default());
 
-    commands.insert_resource(UIState::default());
     commands.insert_resource(NextState(Some(NucleotideState::InstantiatingMeta)));
 }
 
-fn render_system(ui_state: Res<UIState>, loaded_font: Res<LoadedFont>, mut contexts: EguiContexts) {
+fn render_battle_system(
+    ui_state: Res<InBattleUIState>,
+    loaded_font: Res<LoadedFont>,
+    mut contexts: EguiContexts,
+) {
     let font = loaded_font.0.clone();
+    egui::SidePanel::left("player_character_panel")
+        .resizable(false)
+        .default_width(200.0)
+        .show(contexts.ctx_mut(), |ui| {
+            let player_state = ui_state.get_character_state(CharacterType::Player);
+            render_player(ui, player_state, CharacterType::Player);
+        });
 
-    match *ui_state {
-        UIState::Loading => {
-            render_loading_ui(contexts);
-        }
-        UIState::InBattle(in_battle_ui_state) => {
-            egui::SidePanel::left("player_character_panel")
-                .resizable(false)
-                .default_width(200.0)
-                .show(contexts.ctx_mut(), |ui| {
-                    let player_state = in_battle_ui_state.player_character_state;
-                    render_player(ui, player_state, CharacterType::Player);
-                });
-
-            egui::SidePanel::right("enemy_character_panel")
-                .resizable(false)
-                .default_width(200.0)
-                .show(contexts.ctx_mut(), |ui| {
-                    let enemy_state = in_battle_ui_state.enemy_character_state;
-                    render_player(ui, enemy_state, CharacterType::Enemy);
-                });
-        }
-        UIState::Paused(paused_state) => render_paused_ui(contexts),
-        UIState::SelectBattleReward(reward_ui_state) => render_select_reward_ui(contexts),
-        UIState::GameOver(game_over_state) => render_game_over_ui(contexts),
-        _ => {
-            panic!("Unhandled UI State: {:?}", ui_state)
-        } // Handle other states as needed.
-    };
+    egui::SidePanel::right("enemy_character_panel")
+        .resizable(false)
+        .default_width(200.0)
+        .show(contexts.ctx_mut(), |ui| {
+            let enemy_state = ui_state.get_character_state(CharacterType::Enemy);
+            render_player(ui, enemy_state, CharacterType::Enemy);
+        });
 }
 
-// Helper Functions
-fn render_select_reward_ui(mut egui_ctx: EguiContexts) {
+fn render_select_reward_system(
+    ui_state: Res<SelectBattleRewardUIState>,
+    loaded_font: Res<LoadedFont>,
+    mut contexts: EguiContexts,
+) {
     egui::Area::new("select-battle-reward-menu")
         .anchor(egui::Align2::CENTER_CENTER, egui::Vec2::ZERO)
-        .show(egui_ctx.ctx_mut(), |ui| {
+        .show(contexts.ctx_mut(), |ui| {
             ui.with_layout(egui::Layout::top_down(egui::Align::Center), |ui| {
                 ui.label(
                     egui::RichText::new("Select Battle Reward")
@@ -98,13 +108,17 @@ fn render_select_reward_ui(mut egui_ctx: EguiContexts) {
         });
 }
 
-fn render_loading_ui(mut egui_ctx: EguiContexts) {
-    egui::Area::new("loading-menu")
+fn render_initializing_battle_system(
+    ui_state: Res<InitializingBattleUIState>,
+    loaded_font: Res<LoadedFont>,
+    mut contexts: EguiContexts,
+) {
+    egui::Area::new("initiazing-battle-screen")
         .anchor(egui::Align2::CENTER_CENTER, egui::Vec2::ZERO)
-        .show(egui_ctx.ctx_mut(), |ui| {
+        .show(contexts.ctx_mut(), |ui| {
             ui.with_layout(egui::Layout::top_down(egui::Align::Center), |ui| {
                 ui.label(
-                    egui::RichText::new("Loading")
+                    egui::RichText::new("Initializing Battle")
                         .size(20.)
                         .text_style(egui::TextStyle::Heading)
                         .underline()
@@ -114,10 +128,14 @@ fn render_loading_ui(mut egui_ctx: EguiContexts) {
         });
 }
 
-fn render_paused_ui(mut egui_ctx: EguiContexts) {
+fn render_paused_system(
+    ui_state: Res<PausedUIState>,
+    loaded_font: Res<LoadedFont>,
+    mut contexts: EguiContexts,
+) {
     egui::Area::new("pause-menu")
         .anchor(egui::Align2::CENTER_CENTER, egui::Vec2::ZERO)
-        .show(egui_ctx.ctx_mut(), |ui| {
+        .show(contexts.ctx_mut(), |ui| {
             ui.with_layout(egui::Layout::top_down(egui::Align::Center), |ui| {
                 ui.label(
                     egui::RichText::new("Paused")
@@ -130,10 +148,14 @@ fn render_paused_ui(mut egui_ctx: EguiContexts) {
         });
 }
 
-fn render_game_over_ui(mut egui_ctx: EguiContexts) {
+fn render_game_over_system(
+    ui_state: Res<GameOverUIState>,
+    loaded_font: Res<LoadedFont>,
+    mut contexts: EguiContexts,
+) {
     egui::Area::new("game-over-menu")
         .anchor(egui::Align2::CENTER_CENTER, egui::Vec2::ZERO)
-        .show(egui_ctx.ctx_mut(), |ui| {
+        .show(contexts.ctx_mut(), |ui| {
             ui.with_layout(egui::Layout::top_down(egui::Align::Center), |ui| {
                 ui.label(
                     egui::RichText::new("Game Over")
@@ -146,6 +168,7 @@ fn render_game_over_ui(mut egui_ctx: EguiContexts) {
         });
 }
 
+// Helper Functions
 fn render_player(
     mut ui: &mut Ui,
     character_state: CharacterUIState,
@@ -171,10 +194,11 @@ fn render_player(
         ui.label("Genome:");
         for gene_state in &character_state.genome.genes {
             ui.horizontal(|ui| {
-                let mut gene_text = RichText::new(gene_state.gene.to_string());
-                if gene_state.is_active {
-                    gene_text.color(egui::Color32::GREEN);
-                }
+                let gene_text = if gene_state.is_active {
+                    RichText::new(gene_state.gene.to_string()).color(egui::Color32::GREEN)
+                } else {
+                    RichText::new(gene_state.gene.to_string())
+                };
                 let gene_label = ui.label(gene_text);
                 if gene_label.hovered() {
                     gene_label.on_hover_text(gene_state.hovertext.clone());

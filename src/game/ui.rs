@@ -1,3 +1,4 @@
+use bevy::window::PrimaryWindow;
 use bevy::{asset::LoadState, prelude::*};
 use bevy_egui::{egui, EguiContexts, EguiPlugin};
 use egui::{RichText, Ui};
@@ -37,6 +38,14 @@ impl Plugin for UIPlugin {
             render_paused_system.run_if(in_state(NucleotideState::Paused)),
             render_select_reward_system.run_if(in_state(NucleotideState::SelectBattleReward)),
         ));
+
+        app.insert_resource(InitializingBattleUIState::default());
+        app.insert_resource(InBattleUIState::from_state(
+            NucleotideState::CharacterActing,
+        ));
+        app.insert_resource(PausedUIState::default());
+        app.insert_resource(SelectBattleRewardUIState::default());
+        app.insert_resource(GameOverUIState::default());
     }
 }
 
@@ -67,21 +76,32 @@ fn ui_load_system(mut commands: Commands, asset_server: Res<AssetServer>) {
 
 fn render_battle_system(
     ui_state: Res<InBattleUIState>,
+    window_query: Query<&Window, With<PrimaryWindow>>,
     loaded_font: Res<LoadedFont>,
     mut contexts: EguiContexts,
 ) {
     let font = loaded_font.0.clone();
-    egui::SidePanel::left("player_character_panel")
-        .resizable(false)
-        .default_width(200.0)
+    let window = window_query.single();
+
+    let player_position = egui::Pos2::new(20.0, window.height() - 220.0);
+    let player_size = egui::Vec2::new(300.0, 200.0);
+
+    let enemy_position = egui::Pos2::new(window.width() - 220.0, 20.0);
+    let enemy_size = egui::Vec2::new(150.0, 100.0);
+
+    egui::containers::Window::new("player-window")
+        .movable(false)
+        .default_pos(player_position)
+        .default_size(player_size)
         .show(contexts.ctx_mut(), |ui| {
             let player_state = ui_state.get_character_state(CharacterType::Player);
             render_player(ui, player_state, CharacterType::Player);
         });
 
-    egui::SidePanel::right("enemy_character_panel")
-        .resizable(false)
-        .default_width(200.0)
+    egui::containers::Window::new("enemy-window")
+        .movable(false)
+        .default_pos(enemy_position)
+        .default_size(enemy_size)
         .show(contexts.ctx_mut(), |ui| {
             let enemy_state = ui_state.get_character_state(CharacterType::Enemy);
             render_player(ui, enemy_state, CharacterType::Enemy);
@@ -178,7 +198,7 @@ fn render_player(
         CharacterType::Player => "Player",
         CharacterType::Enemy => "Enemy",
     };
-    ui.vertical_centered_justified(|ui| {
+    ui.horizontal(|ui| {
         ui.heading(heading);
         ui.label(format!(
             "Energy: {}/{}",

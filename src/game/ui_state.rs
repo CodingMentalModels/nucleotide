@@ -2,7 +2,7 @@ use bevy::prelude::*;
 
 use super::{
     battle::GenomeComponent,
-    resources::{CharacterType, GeneSpecLookup, NucleotideState, Symbol},
+    resources::{CharacterType, GeneSpecLookup, NucleotideState, Player, Symbol},
     specs::StatusEffect,
 };
 
@@ -17,6 +17,26 @@ pub struct InBattleUIState {
 }
 
 impl InBattleUIState {
+    pub fn new(
+        nucleotide_state: NucleotideState,
+        player_character_state: CharacterUIState,
+        enemy_character_state: CharacterUIState,
+    ) -> Self {
+        Self {
+            nucleotide_state,
+            player_character_state,
+            enemy_character_state,
+        }
+    }
+
+    pub fn from_state(state: NucleotideState) -> Self {
+        Self::new(
+            state,
+            CharacterUIState::default(),
+            CharacterUIState::default(),
+        )
+    }
+
     pub fn update_genome(
         &mut self,
         character_type: CharacterType,
@@ -41,7 +61,7 @@ impl InBattleUIState {
     }
 }
 
-#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+#[derive(Debug, Clone, Default, PartialEq, Eq, Hash)]
 pub struct CharacterUIState {
     pub energy_remaining: u8,
     pub total_energy: u8,
@@ -75,7 +95,7 @@ impl CharacterUIState {
     }
 }
 
-#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+#[derive(Debug, Clone, Default, PartialEq, Eq, Hash)]
 pub struct GenomeUIState {
     pub genes: Vec<GeneUIState>,
 }

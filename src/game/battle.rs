@@ -92,15 +92,12 @@ fn initialize_battle_system(
     current_state: Res<State<NucleotideState>>,
     mut next_state: ResMut<NextState<NucleotideState>>,
 ) {
+    let enemy = enemy_queue
+        .pop()
+        .expect("There should always be more enemies!");
+
     let player_entity = instantiate_player(&mut commands, player);
-    let enemy_entity = instantiate_enemy(
-        &mut commands,
-        enemy_queue
-            .pop()
-            .expect("There should always be more enemies!"),
-        gene_specs,
-        enemy_specs,
-    );
+    let enemy_entity = instantiate_enemy(&mut commands, enemy, gene_specs, enemy_specs);
 
     commands.insert_resource(CharacterActing(player_entity));
     let character_type_to_entity: Vec<_> = vec![
@@ -109,7 +106,9 @@ fn initialize_battle_system(
     ]
     .into_iter()
     .collect();
+
     commands.insert_resource(CharacterTypeToEntity(character_type_to_entity));
+
     queue_next_state_if_not_already_queued(
         current_state.0,
         &mut next_state,

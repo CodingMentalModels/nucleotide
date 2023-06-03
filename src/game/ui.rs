@@ -74,15 +74,9 @@ fn ui_load_system(mut commands: Commands, asset_server: Res<AssetServer>) {
     commands.insert_resource(NextState(Some(NucleotideState::InstantiatingMeta)));
 }
 
-fn render_battle_system(
-    ui_state: Res<InBattleUIState>,
-    window_query: Query<&Window, With<PrimaryWindow>>,
-    mut contexts: EguiContexts,
-) {
-    let window = window_query.single();
-
-    let player_size = egui::Vec2::new(1000.0, 1000.0);
-    let enemy_size = egui::Vec2::new(150.0, 100.0);
+fn render_battle_system(ui_state: Res<InBattleUIState>, mut contexts: EguiContexts) {
+    let player_size = egui::Vec2::new(PLAYER_WINDOW_SIZE.0, PLAYER_WINDOW_SIZE.1);
+    let enemy_size = egui::Vec2::new(ENEMY_WINDOW_SIZE.0, ENEMY_WINDOW_SIZE.1);
 
     let player_state = ui_state.get_character_state(CharacterType::Player);
     let enemy_state = ui_state.get_character_state(CharacterType::Enemy);

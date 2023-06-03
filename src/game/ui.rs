@@ -81,13 +81,8 @@ fn render_battle_system(
 ) {
     let window = window_query.single();
 
-    let player_position = egui::Pos2::new(20.0, window.height() - 220.0);
     let player_size = egui::Vec2::new(1000.0, 1000.0);
-    let player_rect = egui::Rect::from_two_pos(player_position, player_position + player_size);
-
-    let enemy_position = egui::Pos2::new(window.width() - 220.0, 20.0);
     let enemy_size = egui::Vec2::new(150.0, 100.0);
-    let enemy_rect = egui::Rect::from_two_pos(enemy_position, enemy_position + enemy_size);
 
     let player_state = ui_state.get_character_state(CharacterType::Player);
     let enemy_state = ui_state.get_character_state(CharacterType::Enemy);
@@ -96,9 +91,9 @@ fn render_battle_system(
         &mut contexts,
         player_state,
         CharacterType::Player,
-        player_rect,
+        player_size,
     );
-    render_player(&mut contexts, enemy_state, CharacterType::Enemy, enemy_rect);
+    render_player(&mut contexts, enemy_state, CharacterType::Enemy, enemy_size);
 }
 
 fn render_select_reward_system(
@@ -186,18 +181,31 @@ fn render_player(
     contexts: &mut EguiContexts,
     character_state: CharacterUIState,
     character_type: CharacterType,
-    rect: egui::Rect,
+    size: egui::Vec2,
 ) {
-    let (window_name, heading) = match character_type {
-        CharacterType::Player => ("player-window", "Player"),
-        CharacterType::Enemy => ("enemy-window", "Enemy"),
+    let (window_name, heading, anchor, offset) = match character_type {
+        CharacterType::Player => (
+            "player-window",
+            "Player:",
+            egui::Align2::LEFT_BOTTOM,
+            egui::Vec2::new(20., -20.),
+        ),
+        CharacterType::Enemy => (
+            "enemy-window",
+            "Enemy:",
+            egui::Align2::RIGHT_TOP,
+            egui::Vec2::new(-20., 20.),
+        ),
     };
 
     egui::containers::Window::new(window_name)
         .movable(false)
         .title_bar(false)
-        .fixed_rect(rect)
+        .anchor(anchor, offset)
+        .default_size(size)
+        .fixed_size(size)
         .show(contexts.ctx_mut(), |ui| {
+            ui.label(heading);
             ui.label(format!(
                 "Energy: {}/{}",
                 character_state.energy_remaining, character_state.total_energy
@@ -210,8 +218,8 @@ fn render_player(
 
             // Display the genome state.
             ui.label("Genome:");
-            for gene_state in &character_state.genome.genes {
-                ui.horizontal(|ui| {
+            ui.horizontal(|ui| {
+                for gene_state in &character_state.genome.genes {
                     let gene_text = if gene_state.is_active {
                         RichText::new(gene_state.gene.to_string()).color(egui::Color32::GREEN)
                     } else {
@@ -221,8 +229,8 @@ fn render_player(
                     if gene_label.hovered() {
                         gene_label.on_hover_text(gene_state.hovertext.clone());
                     }
-                });
-            }
+                }
+            });
         });
 }
 // End Helper Functions

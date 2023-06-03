@@ -77,35 +77,28 @@ fn ui_load_system(mut commands: Commands, asset_server: Res<AssetServer>) {
 fn render_battle_system(
     ui_state: Res<InBattleUIState>,
     window_query: Query<&Window, With<PrimaryWindow>>,
-    loaded_font: Res<LoadedFont>,
     mut contexts: EguiContexts,
 ) {
-    let font = loaded_font.0.clone();
     let window = window_query.single();
 
     let player_position = egui::Pos2::new(20.0, window.height() - 220.0);
-    let player_size = egui::Vec2::new(300.0, 200.0);
+    let player_size = egui::Vec2::new(1000.0, 1000.0);
+    let player_rect = egui::Rect::from_two_pos(player_position, player_position + player_size);
 
     let enemy_position = egui::Pos2::new(window.width() - 220.0, 20.0);
     let enemy_size = egui::Vec2::new(150.0, 100.0);
+    let enemy_rect = egui::Rect::from_two_pos(enemy_position, enemy_position + enemy_size);
 
-    egui::containers::Window::new("player-window")
-        .movable(false)
-        .default_pos(player_position)
-        .default_size(player_size)
-        .show(contexts.ctx_mut(), |ui| {
-            let player_state = ui_state.get_character_state(CharacterType::Player);
-            render_player(ui, player_state, CharacterType::Player);
-        });
+    let player_state = ui_state.get_character_state(CharacterType::Player);
+    let enemy_state = ui_state.get_character_state(CharacterType::Enemy);
 
-    egui::containers::Window::new("enemy-window")
-        .movable(false)
-        .default_pos(enemy_position)
-        .default_size(enemy_size)
-        .show(contexts.ctx_mut(), |ui| {
-            let enemy_state = ui_state.get_character_state(CharacterType::Enemy);
-            render_player(ui, enemy_state, CharacterType::Enemy);
-        });
+    render_player(
+        &mut contexts,
+        player_state,
+        CharacterType::Player,
+        player_rect,
+    );
+    render_player(&mut contexts, enemy_state, CharacterType::Enemy, enemy_rect);
 }
 
 fn render_select_reward_system(
@@ -190,41 +183,46 @@ fn render_game_over_system(
 
 // Helper Functions
 fn render_player(
-    mut ui: &mut Ui,
+    contexts: &mut EguiContexts,
     character_state: CharacterUIState,
     character_type: CharacterType,
+    rect: egui::Rect,
 ) {
-    let heading = match character_type {
-        CharacterType::Player => "Player",
-        CharacterType::Enemy => "Enemy",
+    let (window_name, heading) = match character_type {
+        CharacterType::Player => ("player-window", "Player"),
+        CharacterType::Enemy => ("enemy-window", "Enemy"),
     };
-    ui.horizontal(|ui| {
-        ui.heading(heading);
-        ui.label(format!(
-            "Energy: {}/{}",
-            character_state.energy_remaining, character_state.total_energy
-        ));
-        ui.label(format!("Health: {}", character_state.health));
-        ui.label(format!("Block: {}", character_state.block));
-        for (effect, amount) in &character_state.status_effects {
-            ui.label(format!("Effect: {:?} x{:?}", effect, amount));
-        }
 
-        // Display the genome state.
-        ui.label("Genome:");
-        for gene_state in &character_state.genome.genes {
-            ui.horizontal(|ui| {
-                let gene_text = if gene_state.is_active {
-                    RichText::new(gene_state.gene.to_string()).color(egui::Color32::GREEN)
-                } else {
-                    RichText::new(gene_state.gene.to_string())
-                };
-                let gene_label = ui.label(gene_text);
-                if gene_label.hovered() {
-                    gene_label.on_hover_text(gene_state.hovertext.clone());
-                }
-            });
-        }
-    });
+    egui::containers::Window::new(window_name)
+        .movable(false)
+        .title_bar(false)
+        .fixed_rect(rect)
+        .show(contexts.ctx_mut(), |ui| {
+            ui.label(format!(
+                "Energy: {}/{}",
+                character_state.energy_remaining, character_state.total_energy
+            ));
+            ui.label(format!("Health: {}", character_state.health));
+            ui.label(format!("Block: {}", character_state.block));
+            for (effect, amount) in &character_state.status_effects {
+                ui.label(format!("Effect: {:?} x{:?}", effect, amount));
+            }
+
+            // Display the genome state.
+            ui.label("Genome:");
+            for gene_state in &character_state.genome.genes {
+                ui.horizontal(|ui| {
+                    let gene_text = if gene_state.is_active {
+                        RichText::new(gene_state.gene.to_string()).color(egui::Color32::GREEN)
+                    } else {
+                        RichText::new(gene_state.gene.to_string())
+                    };
+                    let gene_label = ui.label(gene_text);
+                    if gene_label.hovered() {
+                        gene_label.on_hover_text(gene_state.hovertext.clone());
+                    }
+                });
+            }
+        });
 }
 // End Helper Functions

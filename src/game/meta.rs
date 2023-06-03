@@ -43,7 +43,6 @@ fn instantiate_meta_system(mut commands: Commands, enemy_specs: Res<EnemySpecs>)
     commands.insert_resource(player);
     commands.insert_resource(enemy_queue);
 
-    commands.insert_resource(InitializingBattleUIState::default());
     commands.insert_resource(NextState(Some(NucleotideState::InitializingBattle)));
 }
 

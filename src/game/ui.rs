@@ -182,13 +182,13 @@ fn render_player(
             "player-window",
             "Player:",
             egui::Align2::LEFT_BOTTOM,
-            egui::Vec2::new(20., -20.),
+            egui::Vec2::new(CHARACTER_WINDOW_OFFSET, -CHARACTER_WINDOW_OFFSET),
         ),
         CharacterType::Enemy => (
             "enemy-window",
             "Enemy:",
             egui::Align2::RIGHT_TOP,
-            egui::Vec2::new(-20., 20.),
+            egui::Vec2::new(-CHARACTER_WINDOW_OFFSET, CHARACTER_WINDOW_OFFSET),
         ),
     };
 

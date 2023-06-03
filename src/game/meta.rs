@@ -2,7 +2,10 @@ use bevy::prelude::*;
 
 use crate::game::resources::*;
 
-use super::constants::{STARTING_PLAYER_ENERGY, STARTING_PLAYER_HEALTH};
+use super::{
+    constants::{STARTING_PLAYER_ENERGY, STARTING_PLAYER_HEALTH},
+    ui_state::InitializingBattleUIState,
+};
 
 pub struct MetaPlugin;
 
@@ -44,4 +47,3 @@ fn instantiate_meta_system(mut commands: Commands, enemy_specs: Res<EnemySpecs>)
 }
 
 // End Systems
-

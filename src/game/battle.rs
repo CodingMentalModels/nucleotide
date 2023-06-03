@@ -1,5 +1,3 @@
-use std::collections::BTreeMap;
-
 use bevy::prelude::*;
 
 use crate::game::constants::*;
@@ -10,8 +8,10 @@ use super::specs::ActivationTiming;
 use super::specs::EnemyName;
 use super::specs::StatusEffect;
 use super::specs::{GeneCommand, TargetType};
-use super::ui::GenomeDisplayComponent;
-use super::ui::{CharacterStatComponent, DisplayComponent};
+use super::ui_state::CharacterUIState;
+use super::ui_state::GeneUIState;
+use super::ui_state::GenomeUIState;
+use super::ui_state::InBattleUIState;
 
 pub type TargetEntity = Entity;
 
@@ -92,15 +92,12 @@ fn initialize_battle_system(
     current_state: Res<State<NucleotideState>>,
     mut next_state: ResMut<NextState<NucleotideState>>,
 ) {
+    let enemy = enemy_queue
+        .pop()
+        .expect("There should always be more enemies!");
+
     let player_entity = instantiate_player(&mut commands, player);
-    let enemy_entity = instantiate_enemy(
-        &mut commands,
-        enemy_queue
-            .pop()
-            .expect("There should always be more enemies!"),
-        gene_specs,
-        enemy_specs,
-    );
+    let enemy_entity = instantiate_enemy(&mut commands, enemy, gene_specs, enemy_specs);
 
     commands.insert_resource(CharacterActing(player_entity));
     let character_type_to_entity: Vec<_> = vec![
@@ -109,7 +106,9 @@ fn initialize_battle_system(
     ]
     .into_iter()
     .collect();
+
     commands.insert_resource(CharacterTypeToEntity(character_type_to_entity));
+
     queue_next_state_if_not_already_queued(
         current_state.0,
         &mut next_state,
@@ -357,66 +356,44 @@ fn render_character_display_system(
         &BlockComponent,
         &EnergyComponent,
         &StatusEffectComponent,
+        &GenomeComponent,
     )>,
-    mut display_query: Query<(&CharacterStatComponent, &mut DisplayComponent)>,
+    mut ui_state: ResMut<InBattleUIState>,
     character_type_to_entity_map: Res<CharacterTypeToEntity>,
+    gene_specs: Res<GeneSpecs>,
 ) {
-    for (entity, health, block, energy, status_effects) in character_display_query.iter() {
-        for (display_component, mut display) in display_query.iter_mut() {
-            if entity == character_type_to_entity_map.get(display_component.0) {
-                match display_component.1 {
-                    CharacterStatType::Health => display.value = health.0.to_string(),
-                    CharacterStatType::Block => display.value = block.0.to_string(),
-                    CharacterStatType::Energy => {
-                        display.value =
-                            format!("{} / {}", energy.energy_remaining, energy.starting_energy)
-                    }
-                    CharacterStatType::Statuses => {
-                        display.value = status_effects
-                            .0
-                            .iter()
-                            .map(|(status, n_stacks)| {
-                                format!("{:?}({})", status, n_stacks.to_string())
-                            })
-                            .collect::<Vec<_>>()
-                            .join(" | ");
-                    }
-                }
-            }
+    for (entity, health, block, energy, status_effects, genome) in character_display_query.iter() {
+        if character_type_to_entity_map.is_player(entity) {
+            ui_state.player_character_state = CharacterUIState::new(
+                energy.energy_remaining,
+                energy.starting_energy,
+                health.0,
+                block.0,
+                status_effects.0.clone(),
+                GenomeUIState::from_genome(genome, &gene_specs.0),
+            )
+        } else if character_type_to_entity_map.is_enemy(entity) {
+            ui_state.enemy_character_state = CharacterUIState::new(
+                energy.energy_remaining,
+                energy.starting_energy,
+                health.0,
+                block.0,
+                status_effects.0.clone(),
+                GenomeUIState::from_genome(genome, &gene_specs.0),
+            )
         }
     }
 }
 
 fn render_genome_system(
     character_query: Query<(Entity, &GenomeComponent)>,
-    mut genome_display_query: Query<(&mut GenomeDisplayComponent)>,
+    mut ui_state: ResMut<InBattleUIState>,
     gene_specs: Res<GeneSpecs>,
     character_type_to_entity_map: Res<CharacterTypeToEntity>,
 ) {
     for (entity, genome) in character_query.iter() {
-        for mut genome_display in genome_display_query.iter_mut() {
-            if entity == character_type_to_entity_map.get(genome_display.get_character_type()) {
-                let gene_symbol = genome
-                    .get_gene(genome_display.get_index())
-                    .map(|gene_name| {
-                        gene_specs
-                            .0
-                            .get_symbol_from_name(&gene_name)
-                            .expect("All genes should have valid symbols.")
-                    });
-                genome_display.maybe_set_gene_symbol(gene_symbol);
-
-                let active_gene_symbol = gene_specs
-                    .0
-                    .get_symbol_from_name(&genome.get_active_gene())
-                    .expect("All genes should have valid symbols.");
-                if genome_display.get_gene_symbol() == Some(active_gene_symbol) {
-                    genome_display.set_active();
-                } else {
-                    genome_display.clear_active();
-                }
-            }
-        }
+        let character_type = character_type_to_entity_map.get_character_type(entity);
+        ui_state.update_genome(character_type, genome, &gene_specs.0);
     }
 }
 
@@ -467,6 +444,25 @@ impl GenomeComponent {
         Self::new(genes, 0, GeneProcessingOrder::Forward, 0)
     }
 
+    pub fn get_gene_ui_states(&self, gene_spec_lookup: &GeneSpecLookup) -> Vec<GeneUIState> {
+        self.genes
+            .iter()
+            .enumerate()
+            .map(|(i, gene)| {
+                let symbol = gene_spec_lookup
+                    .get_symbol_from_name(gene)
+                    .expect("All genes should have a valid symbol.");
+                GeneUIState::new(
+                    symbol,
+                    (i == self.get_pointer()),
+                    gene_spec_lookup
+                        .get_card_from_symbol(symbol)
+                        .expect("All genes should have a valid symbol."),
+                )
+            })
+            .collect()
+    }
+
     pub fn get_genes(&self) -> Vec<String> {
         self.genes.clone()
     }
@@ -507,6 +503,10 @@ impl GenomeComponent {
 
     pub fn increment_repeat_gene(&mut self) {
         self.repeat_gene += 1;
+    }
+
+    pub fn get_pointer(&self) -> usize {
+        self.pointer
     }
 }
 

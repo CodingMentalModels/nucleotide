@@ -5,7 +5,12 @@ pub const GENE_SPEC_DIRECTORY: &str = "assets/specs/genes/";
 
 // Game Parameters
 pub const STARTING_PLAYER_ENERGY: u8 = 3;
-pub const STARTING_PLAYER_HEALTH: u8 = 2;
+pub const STARTING_PLAYER_HEALTH: u8 = 100;
+
+// UI
+pub const PLAYER_WINDOW_SIZE: (f32, f32) = (300.0, 200.0);
+pub const ENEMY_WINDOW_SIZE: (f32, f32) = (150.0, 100.0);
+pub const CHARACTER_WINDOW_OFFSET: f32 = 20.;
 
 // Greek Letters
 pub const ALPHA_LOWER: char = 'α';
@@ -82,7 +87,6 @@ pub const GREEK_ALPHABET: &'static [char] = &[
     CHI_LOWER,
     PSI_LOWER,
     OMEGA_LOWER,
-
     ALPHA_UPPER,
     BETA_UPPER,
     GAMMA_UPPER,

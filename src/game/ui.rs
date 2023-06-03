@@ -1,10 +1,16 @@
-use bevy::ui::RelativeCursorPosition;
-use bevy::window::{Cursor, PrimaryWindow};
+use bevy::window::PrimaryWindow;
 use bevy::{asset::LoadState, prelude::*};
 use bevy_egui::{egui, EguiContexts, EguiPlugin};
+use egui::{RichText, Ui};
 
 use crate::game::constants::*;
 use crate::game::resources::*;
+
+use super::ui_state::InitializingBattleUIState;
+use super::ui_state::{
+    CharacterUIState, GameOverUIState, GenomeUIState, InBattleUIState, PausedUIState,
+    SelectBattleRewardUIState,
+};
 
 pub struct UIPlugin;
 
@@ -12,10 +18,6 @@ impl Plugin for UIPlugin {
     fn build(&self, app: &mut App) {
         let get_battle_states_condition = || {
             in_state(NucleotideState::Paused)
-                .or_else(in_state(NucleotideState::Paused))
-                .or_else(in_state(NucleotideState::InstantiatingMeta))
-                .or_else(in_state(NucleotideState::Drafting))
-                .or_else(in_state(NucleotideState::InitializingBattle))
                 .or_else(in_state(NucleotideState::CharacterActing))
                 .or_else(in_state(NucleotideState::StartOfTurn))
                 .or_else(in_state(NucleotideState::GeneLoading))
@@ -25,108 +27,27 @@ impl Plugin for UIPlugin {
                 .or_else(in_state(NucleotideState::GeneAnimating))
         };
 
+        let or_paused_condition =
+            |state: NucleotideState| in_state(NucleotideState::Paused).or_else(in_state(state));
+
         app.add_plugin(EguiPlugin).add_systems((
             configure_visuals.in_schedule(OnEnter(NucleotideState::LoadingUI)),
             ui_load_system.in_schedule(OnEnter(NucleotideState::LoadingUI)),
-            render_system.run_if(in_state(NucleotideState::GeneAnimating)),
-            display_state_system.run_if(get_battle_states_condition()),
-            display_genome_system.run_if(get_battle_states_condition()),
-            hover_over_gene_system
-                .run_if(get_battle_states_condition())
-                .after(display_genome_system),
-            paused_ui_system.run_if(in_state(NucleotideState::Paused)),
-            game_over_ui_system.run_if(in_state(NucleotideState::GameOver)),
+            render_initializing_battle_system.run_if(in_state(NucleotideState::InitializingBattle)),
+            render_battle_system.run_if(get_battle_states_condition()),
+            render_paused_system.run_if(in_state(NucleotideState::Paused)),
+            render_select_reward_system.run_if(in_state(NucleotideState::SelectBattleReward)),
         ));
+
+        app.insert_resource(InitializingBattleUIState::default());
+        app.insert_resource(InBattleUIState::from_state(
+            NucleotideState::CharacterActing,
+        ));
+        app.insert_resource(PausedUIState::default());
+        app.insert_resource(SelectBattleRewardUIState::default());
+        app.insert_resource(GameOverUIState::default());
     }
 }
-
-// Components
-#[derive(Component, Clone)]
-pub struct DisplayComponent {
-    pub prefix: String,
-    pub value: String,
-}
-
-impl DisplayComponent {
-    pub fn new(prefix: String, value: String) -> Self {
-        Self { prefix, value }
-    }
-
-    pub fn new_with_u8_value(prefix: String, value: u8) -> Self {
-        Self::new(prefix, value.to_string())
-    }
-}
-
-#[derive(Component, Clone)]
-pub struct CharacterStatComponent(pub CharacterType, pub CharacterStatType);
-
-#[derive(Component, Clone)]
-pub struct GenomeDisplayComponent {
-    character_type: CharacterType,
-    gene: Option<(Symbol, bool)>,
-    index: usize,
-}
-
-impl GenomeDisplayComponent {
-    pub fn new(character_type: CharacterType, gene: Option<(Symbol, bool)>, index: usize) -> Self {
-        Self {
-            character_type,
-            gene,
-            index,
-        }
-    }
-
-    pub fn get_character_type(&self) -> CharacterType {
-        self.character_type
-    }
-
-    pub fn get_gene_symbol(&self) -> Option<Symbol> {
-        self.gene.map(|(symbol, _)| symbol)
-    }
-
-    pub fn set_gene_symbol(&mut self, gene: Symbol) {
-        self.gene = Some((gene, false));
-    }
-
-    pub fn maybe_set_gene_symbol(&mut self, maybe_gene_symbol: Option<Symbol>) {
-        match maybe_gene_symbol {
-            Some(gene) => self.set_gene_symbol(gene),
-            None => self.clear(),
-        }
-    }
-
-    pub fn get_index(&self) -> usize {
-        self.index
-    }
-
-    pub fn is_active(&self) -> bool {
-        match self.gene {
-            Some((_, is_active)) => is_active,
-            None => false,
-        }
-    }
-
-    pub fn set_active(&mut self) {
-        match self.gene {
-            Some((symbol, _)) => self.gene = Some((symbol, true)),
-            None => (),
-        }
-    }
-
-    pub fn clear_active(&mut self) {
-        match self.gene {
-            Some((symbol, _)) => self.gene = Some((symbol, false)),
-            None => (),
-        }
-    }
-
-    pub fn clear(&mut self) {
-        self.gene = None;
-        self.clear_active();
-    }
-}
-
-// End Components
 
 // Systems
 fn configure_visuals(mut ctx: EguiContexts) {
@@ -150,128 +71,73 @@ fn ui_load_system(mut commands: Commands, asset_server: Res<AssetServer>) {
 
     commands.spawn(Camera2dBundle::default());
 
-    commands
-        .spawn(NodeBundle {
-            style: Style {
-                size: Size::new(Val::Percent(100.0), Val::Percent(100.0)),
-                position_type: PositionType::Absolute,
-                justify_content: JustifyContent::FlexStart,
-                align_items: AlignItems::FlexStart,
-                ..Default::default()
-            },
-            background_color: Color::NONE.into(),
-            ..Default::default()
-        })
-        .with_children(|parent| {
-            // State
-            parent
-                .spawn(get_text_bundle(
-                    "State: Uninitialized",
-                    get_text_style(font.clone(), Color::WHITE, 20.0),
-                    JustifyContent::FlexStart,
-                    5.0,
-                ))
-                .insert(DisplayComponent::new(
-                    "State".to_string(),
-                    "Uninitialized".to_string(),
-                ));
-
-            initialize_character_ui(parent, font.clone(), CharacterType::Player, 0.0, 50.0, 50.0);
-
-            initialize_character_ui(parent, font.clone(), CharacterType::Enemy, 30.0, 0.0, 30.0);
-        });
-
     commands.insert_resource(NextState(Some(NucleotideState::InstantiatingMeta)));
 }
 
-fn battle_ui_system(mut egui_ctx: EguiContexts, query: Query<&Text>) {
-    egui::TopBottomPanel::top("top_panel").show(egui_ctx.ctx_mut(), |ui| {
-        ui.label("Nucleotide");
-    });
+fn render_battle_system(ui_state: Res<InBattleUIState>, mut contexts: EguiContexts) {
+    let player_size = egui::Vec2::new(PLAYER_WINDOW_SIZE.0, PLAYER_WINDOW_SIZE.1);
+    let enemy_size = egui::Vec2::new(ENEMY_WINDOW_SIZE.0, ENEMY_WINDOW_SIZE.1);
+
+    let player_state = ui_state.get_character_state(CharacterType::Player);
+    let enemy_state = ui_state.get_character_state(CharacterType::Enemy);
+
+    render_player(
+        &mut contexts,
+        player_state,
+        CharacterType::Player,
+        player_size,
+    );
+    render_player(&mut contexts, enemy_state, CharacterType::Enemy, enemy_size);
 }
 
-fn render_system(mut query: Query<(&DisplayComponent, &mut Text)>) {
-    for (display, mut text) in &mut query {
-        text.sections[0].value = format!(
-            "{}: {}",
-            display.prefix.to_string(),
-            display.value.to_string()
-        );
-    }
-}
-
-fn display_state_system(
-    mut query: Query<(&mut DisplayComponent, &mut Text)>,
-    state: Res<State<NucleotideState>>,
-    character_acting: Option<Res<CharacterActing>>,
-    character_type_to_entity: Option<Res<CharacterTypeToEntity>>,
-    paused_state: Res<PausedState>,
-) {
-    for (display, mut text) in &mut query {
-        if display.prefix == "State" {
-            let suffix = if state.0 == NucleotideState::Paused {
-                format!("Paused ({:?})", paused_state.0)
-            } else {
-                format!("{:?}", state.0)
-            };
-            match (character_acting.as_ref(), character_type_to_entity.as_ref()) {
-                (Some(character_acting), Some(character_type_to_entity)) => {
-                    let acting = character_type_to_entity.get_character_type(character_acting.0);
-                    text.sections[0].value = format!(
-                        "{}: {}\nCharacter Acting: {:?}",
-                        display.prefix.to_string(),
-                        suffix,
-                        acting
-                    );
-                }
-                _ => {
-                    text.sections[0].value = format!("{}: {}", display.prefix.to_string(), suffix);
-                }
-            }
-        }
-    }
-}
-
-fn display_genome_system(mut query: Query<(&GenomeDisplayComponent, &mut Text)>) {
-    for (display, mut text) in &mut query {
-        text.sections[0].value = display.get_gene_symbol().unwrap_or(' ').to_string();
-        text.sections[0].style.color = if display.is_active() {
-            Color::YELLOW_GREEN
-        } else {
-            Color::WHITE
-        };
-    }
-}
-
-fn hover_over_gene_system(
-    mut commands: Commands,
-    mut query: Query<(Entity, &GenomeDisplayComponent, &RelativeCursorPosition)>,
-    window_query: Query<&Window>,
-    camera_query: Query<(&Camera, &GlobalTransform)>,
-    gene_specs: Res<GeneSpecs>,
+fn render_select_reward_system(
+    ui_state: Res<SelectBattleRewardUIState>,
     loaded_font: Res<LoadedFont>,
+    mut contexts: EguiContexts,
 ) {
-    assert_eq!(window_query.iter().count(), 1);
-    assert_eq!(camera_query.iter().count(), 1);
-
-    for (gene_entity, display, relative_cursor_position) in &mut query {
-        commands.entity(gene_entity).despawn_descendants();
-        if relative_cursor_position.mouse_over() {
-            let gene_card_text = display
-                .get_gene_symbol()
-                .and_then(|symbol| gene_specs.0.get_card_from_symbol(symbol))
-                .unwrap_or(" ".to_string());
-            commands.entity(gene_entity).with_children(|parent| {
-                render_gene_card(parent, gene_card_text, loaded_font.0.clone());
+    egui::Area::new("select-battle-reward-menu")
+        .anchor(egui::Align2::CENTER_CENTER, egui::Vec2::ZERO)
+        .show(contexts.ctx_mut(), |ui| {
+            ui.with_layout(egui::Layout::top_down(egui::Align::Center), |ui| {
+                ui.label(
+                    egui::RichText::new("Select Battle Reward")
+                        .size(20.)
+                        .text_style(egui::TextStyle::Heading)
+                        .underline()
+                        .color(egui::Color32::BLACK),
+                );
             });
-        }
-    }
+        });
 }
 
-fn paused_ui_system(mut egui_ctx: EguiContexts) {
+fn render_initializing_battle_system(
+    ui_state: Res<InitializingBattleUIState>,
+    loaded_font: Res<LoadedFont>,
+    mut contexts: EguiContexts,
+) {
+    egui::Area::new("initiazing-battle-screen")
+        .anchor(egui::Align2::CENTER_CENTER, egui::Vec2::ZERO)
+        .show(contexts.ctx_mut(), |ui| {
+            ui.with_layout(egui::Layout::top_down(egui::Align::Center), |ui| {
+                ui.label(
+                    egui::RichText::new("Initializing Battle")
+                        .size(20.)
+                        .text_style(egui::TextStyle::Heading)
+                        .underline()
+                        .color(egui::Color32::BLACK),
+                );
+            });
+        });
+}
+
+fn render_paused_system(
+    ui_state: Res<PausedUIState>,
+    loaded_font: Res<LoadedFont>,
+    mut contexts: EguiContexts,
+) {
     egui::Area::new("pause-menu")
         .anchor(egui::Align2::CENTER_CENTER, egui::Vec2::ZERO)
-        .show(egui_ctx.ctx_mut(), |ui| {
+        .show(contexts.ctx_mut(), |ui| {
             ui.with_layout(egui::Layout::top_down(egui::Align::Center), |ui| {
                 ui.label(
                     egui::RichText::new("Paused")
@@ -284,10 +150,14 @@ fn paused_ui_system(mut egui_ctx: EguiContexts) {
         });
 }
 
-fn game_over_ui_system(mut egui_ctx: EguiContexts) {
+fn render_game_over_system(
+    ui_state: Res<GameOverUIState>,
+    loaded_font: Res<LoadedFont>,
+    mut contexts: EguiContexts,
+) {
     egui::Area::new("game-over-menu")
         .anchor(egui::Align2::CENTER_CENTER, egui::Vec2::ZERO)
-        .show(egui_ctx.ctx_mut(), |ui| {
+        .show(contexts.ctx_mut(), |ui| {
             ui.with_layout(egui::Layout::top_down(egui::Align::Center), |ui| {
                 ui.label(
                     egui::RichText::new("Game Over")
@@ -301,157 +171,60 @@ fn game_over_ui_system(mut egui_ctx: EguiContexts) {
 }
 
 // Helper Functions
-
-fn get_text_bundle(
-    text: &str,
-    text_style: TextStyle,
-    justify_content: JustifyContent,
-    margin_width: f32,
-) -> TextBundle {
-    TextBundle::from_section(text.to_string(), text_style)
-        .with_text_alignment(TextAlignment::Center)
-        .with_style(Style {
-            align_self: AlignSelf::FlexStart,
-            justify_content: justify_content,
-            margin: UiRect::all(Val::Px(margin_width)),
-            ..Default::default()
-        })
-}
-
-fn get_text_style(font: Handle<Font>, color: Color, font_size: f32) -> TextStyle {
-    TextStyle {
-        font: font,
-        font_size,
-        color: color,
-    }
-}
-
-fn initialize_character_ui(
-    parent: &mut ChildBuilder,
-    font: Handle<Font>,
+fn render_player(
+    contexts: &mut EguiContexts,
+    character_state: CharacterUIState,
     character_type: CharacterType,
-    left: f32,
-    top: f32,
-    size: f32,
+    size: egui::Vec2,
 ) {
-    parent
-        .spawn(NodeBundle {
-            style: Style {
-                size: Size::new(Val::Percent(size), Val::Percent(size)),
-                position_type: PositionType::Absolute,
-                position: UiRect {
-                    left: Val::Percent(left),
-                    top: Val::Percent(top),
-                    ..Default::default()
-                },
-                flex_direction: FlexDirection::Column,
-                justify_content: JustifyContent::FlexStart,
-                align_items: AlignItems::FlexStart,
-                ..Default::default()
-            },
-            background_color: Color::BLACK.into(),
-            ..Default::default()
-        })
-        .with_children(|parent| {
-            parent.spawn(get_text_bundle(
-                &character_type.to_string(),
-                get_text_style(font.clone(), Color::WHITE, 20.0),
-                JustifyContent::FlexStart,
-                5.0,
+    let (window_name, heading, anchor, offset) = match character_type {
+        CharacterType::Player => (
+            "player-window",
+            "Player:",
+            egui::Align2::LEFT_BOTTOM,
+            egui::Vec2::new(CHARACTER_WINDOW_OFFSET, -CHARACTER_WINDOW_OFFSET),
+        ),
+        CharacterType::Enemy => (
+            "enemy-window",
+            "Enemy:",
+            egui::Align2::RIGHT_TOP,
+            egui::Vec2::new(-CHARACTER_WINDOW_OFFSET, CHARACTER_WINDOW_OFFSET),
+        ),
+    };
+
+    egui::containers::Window::new(window_name)
+        .movable(false)
+        .title_bar(false)
+        .anchor(anchor, offset)
+        .default_size(size)
+        .fixed_size(size)
+        .show(contexts.ctx_mut(), |ui| {
+            ui.label(heading);
+            ui.label(format!(
+                "Energy: {}/{}",
+                character_state.energy_remaining, character_state.total_energy
             ));
-            initialize_gene_container(parent, font.clone(), character_type);
-            initialize_stat_container(
-                parent,
-                font.clone(),
-                character_type,
-                CharacterStatType::Energy,
-                u8::MAX.to_string(),
-            );
-            initialize_stat_container(
-                parent,
-                font.clone(),
-                character_type,
-                CharacterStatType::Health,
-                u8::MAX.to_string(),
-            );
-            initialize_stat_container(
-                parent,
-                font.clone(),
-                character_type,
-                CharacterStatType::Block,
-                u8::MAX.to_string(),
-            );
-            initialize_stat_container(
-                parent,
-                font.clone(),
-                character_type,
-                CharacterStatType::Statuses,
-                u8::MAX.to_string(),
-            );
-        });
-}
-
-fn initialize_gene_container(
-    parent: &mut ChildBuilder,
-    font: Handle<Font>,
-    character_type: CharacterType,
-) {
-    parent
-        .spawn(NodeBundle {
-            style: Style {
-                position_type: PositionType::Relative,
-                flex_direction: FlexDirection::Row,
-                justify_content: JustifyContent::FlexStart,
-                align_items: AlignItems::FlexStart,
-                ..Default::default()
-            },
-            ..Default::default()
-        })
-        .with_children(|gene_container| {
-            for i in 0..GREEK_ALPHABET.len() {
-                gene_container
-                    .spawn(get_text_bundle(
-                        &GREEK_ALPHABET[i].to_string(),
-                        get_text_style(font.clone(), Color::WHITE, 20.0),
-                        JustifyContent::FlexStart,
-                        5.0,
-                    ))
-                    .insert(RelativeCursorPosition::default())
-                    .insert(GenomeDisplayComponent::new(character_type, None, i));
+            ui.label(format!("Health: {}", character_state.health));
+            ui.label(format!("Block: {}", character_state.block));
+            for (effect, amount) in &character_state.status_effects {
+                ui.label(format!("Effect: {:?} x{:?}", effect, amount));
             }
+
+            // Display the genome state.
+            ui.label("Genome:");
+            ui.horizontal(|ui| {
+                for gene_state in &character_state.genome.genes {
+                    let gene_text = if gene_state.is_active {
+                        RichText::new(gene_state.gene.to_string()).color(egui::Color32::GREEN)
+                    } else {
+                        RichText::new(gene_state.gene.to_string())
+                    };
+                    let gene_label = ui.label(gene_text);
+                    if gene_label.hovered() {
+                        gene_label.on_hover_text(gene_state.hovertext.clone());
+                    }
+                }
+            });
         });
-}
-
-fn initialize_stat_container(
-    parent: &mut ChildBuilder,
-    font: Handle<Font>,
-    character_type: CharacterType,
-    stat_type: CharacterStatType,
-    initial_stat_value: String,
-) {
-    parent
-        .spawn(get_text_bundle(
-            "UNINITIALIZED",
-            get_text_style(font.clone(), Color::WHITE, 20.0),
-            JustifyContent::FlexStart,
-            5.0,
-        ))
-        .insert(DisplayComponent::new(
-            stat_type.to_string(),
-            initial_stat_value,
-        ))
-        .insert(CharacterStatComponent(character_type, stat_type));
-}
-
-fn render_gene_card(parent: &mut ChildBuilder, display: String, font: Handle<Font>) {
-    parent.spawn(
-        get_text_bundle(
-            &display.to_string(),
-            get_text_style(font.clone(), Color::WHITE, 20.0),
-            JustifyContent::FlexStart,
-            0.0,
-        )
-        .with_background_color(Color::DARK_GRAY),
-    );
 }
 // End Helper Functions

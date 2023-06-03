@@ -30,6 +30,10 @@ pub enum NucleotideState {
     EndOfTurn,
     GeneAnimating,
     SelectBattleReward,
+    SelectGeneFromEnemy,
+    MoveGene,
+    SwapGene,
+    ResearchGene,
     GameOver,
     Victory,
 }

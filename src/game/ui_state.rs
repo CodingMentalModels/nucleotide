@@ -142,6 +142,9 @@ pub struct PausedUIState;
 pub struct SelectBattleRewardUIState;
 
 #[derive(Debug, Default, Clone, PartialEq, Eq, Hash, Resource)]
+pub struct SelectGeneFromEnemyUIState;
+
+#[derive(Debug, Default, Clone, PartialEq, Eq, Hash, Resource)]
 pub struct GameOverUIState;
 
 #[derive(Debug, Default, Clone, PartialEq, Eq, Hash, Resource)]

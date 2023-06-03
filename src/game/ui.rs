@@ -6,11 +6,11 @@ use egui::{RichText, Ui};
 use crate::game::constants::*;
 use crate::game::resources::*;
 
-use super::ui_state::InitializingBattleUIState;
 use super::ui_state::{
     CharacterUIState, GameOverUIState, GenomeUIState, InBattleUIState, PausedUIState,
     SelectBattleRewardUIState,
 };
+use super::ui_state::{InitializingBattleUIState, SelectGeneFromEnemyUIState};
 
 pub struct UIPlugin;
 
@@ -37,6 +37,8 @@ impl Plugin for UIPlugin {
             render_battle_system.run_if(get_battle_states_condition()),
             render_paused_system.run_if(in_state(NucleotideState::Paused)),
             render_select_reward_system.run_if(in_state(NucleotideState::SelectBattleReward)),
+            render_select_gene_from_enemy_system
+                .run_if(in_state(NucleotideState::SelectGeneFromEnemy)),
         ));
 
         app.insert_resource(InitializingBattleUIState::default());
@@ -91,23 +93,53 @@ fn render_battle_system(ui_state: Res<InBattleUIState>, mut contexts: EguiContex
 }
 
 fn render_select_reward_system(
+    mut commands: Commands,
     ui_state: Res<SelectBattleRewardUIState>,
-    loaded_font: Res<LoadedFont>,
     mut contexts: EguiContexts,
 ) {
-    egui::Area::new("select-battle-reward-menu")
-        .anchor(egui::Align2::CENTER_CENTER, egui::Vec2::ZERO)
-        .show(contexts.ctx_mut(), |ui| {
-            ui.with_layout(egui::Layout::top_down(egui::Align::Center), |ui| {
-                ui.label(
-                    egui::RichText::new("Select Battle Reward")
-                        .size(20.)
-                        .text_style(egui::TextStyle::Heading)
-                        .underline()
-                        .color(egui::Color32::BLACK),
-                );
-            });
-        });
+    let heading = "Select Battle Reward";
+    let options = vec![
+        "Choose new Gene from Enemy",
+        "Move a Gene",
+        "Swap two Genes",
+        "Research a Gene",
+    ];
+    let on_click = |s: &str| match s {
+        "Choose new Gene from Enemy" => {
+            commands.insert_resource(NextState(Some(NucleotideState::SelectBattleReward)))
+        }
+        "Move a Gene" => commands.insert_resource(NextState(Some(NucleotideState::MoveGene))),
+        "Swap two Genes" => commands.insert_resource(NextState(Some(NucleotideState::SwapGene))),
+        "Research a Gene" => {
+            commands.insert_resource(NextState(Some(NucleotideState::ResearchGene)))
+        }
+        v => panic!("Bad value: {}", v),
+    };
+    render_options(&mut contexts, heading, options, on_click);
+}
+
+fn render_select_gene_from_enemy_system(
+    ui_state: Res<SelectGeneFromEnemyUIState>,
+    mut contexts: EguiContexts,
+    enemy_genome_query: Query<Entity, &GenomeComponent>,
+    character_type_to_entity: Res<CharacterTypeToEntity>,
+) {
+    let heading = "Select Gene from Enemy";
+    let enemy_genome = enemy_genome_query
+        .map(|(entity, genome)| {
+            if character_type_to_entity.is_enemy(entity) {
+                Some(genome)
+            } else {
+                None
+            }
+        })
+        .flatten()
+        .first()
+        .expect("There should always be at least one enemy.");
+    // We need to get the player genome as well, then based on the gene symbol chosen, add that
+    // gene to the player genome
+    let on_click = |s: &str| match s {};
+    render_options(&mut contexts, heading, options, on_click);
 }
 
 fn render_initializing_battle_system(
@@ -226,5 +258,30 @@ fn render_player(
                 }
             });
         });
+}
+
+fn render_options(
+    contexts: &mut EguiContexts,
+    heading: &str,
+    options: Vec<&str>,
+    mut on_click: impl FnMut(&str) -> (),
+) {
+    egui::CentralPanel::default().show(contexts.ctx_mut(), |ui| {
+        ui.heading(heading);
+        ui.separator();
+
+        let n_columns = options.len();
+        let button_size = egui::Vec2::new(100.0, 200.0);
+        ui.columns(n_columns, |columns| {
+            for i in 0..n_columns {
+                if columns[i]
+                    .add(egui::Button::new(options[i]).min_size(button_size.into()))
+                    .clicked()
+                {
+                    on_click(options[i]);
+                }
+            }
+        });
+    });
 }
 // End Helper Functions

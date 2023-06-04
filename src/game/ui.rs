@@ -130,46 +130,23 @@ fn render_select_gene_from_enemy_system(
     mut commands: Commands,
     ui_state: Res<SelectGeneFromEnemyUIState>,
     mut contexts: EguiContexts,
-    mut genome_query: Query<(Entity, &mut GenomeComponent)>,
     mut player: ResMut<Player>,
+    enemy_specs: Res<EnemySpecs>,
     character_type_to_entity: Res<CharacterTypeToEntity>,
 ) {
     let heading = "Select Gene from Enemy";
-    let (maybe_player_genome, maybe_enemy_genome) = genome_query
-        .iter_mut()
-        .map(|(entity, genome)| {
-            if character_type_to_entity.is_player(entity) {
-                (Some(genome), None)
-            } else if character_type_to_entity.is_enemy(entity) {
-                (None, Some(genome))
-            } else {
-                (None, None)
-            }
-        })
-        .fold((None, None), |mut acc, e| {
-            if e.0.is_some() {
-                assert!(acc.0.is_none());
-                acc.0 = e.0;
-            }
-            if e.1.is_some() {
-                assert!(acc.1.is_none());
-                acc.1 = e.1;
-            }
-            acc
-        });
 
-    let mut player_genome = maybe_player_genome.expect("Player genome should exist.");
-    let enemy_genome = maybe_enemy_genome.expect("Enemy genome should exist.");
+    let enemy_character_type = character_type_to_entity.get_single_enemy();
+    let enemy_name = enemy_character_type.to_string();
+    let enemy_genome = enemy_specs.get(enemy_name).get_genome();
 
-    let options = enemy_genome.get_genes();
-    let options_clone = options.clone();
+    let options = enemy_genome.clone();
     let on_click = |s: &str| {
-        let gene = options_clone
+        let gene = enemy_genome
             .iter()
             .filter(|gene| gene.as_str() == s)
             .next()
             .expect("The gene is guaranteed to be there.");
-        player_genome.add_gene(gene.clone());
         player.add_gene(gene.clone());
         commands.insert_resource(NextState(Some(NucleotideState::InitializingBattle)));
     };

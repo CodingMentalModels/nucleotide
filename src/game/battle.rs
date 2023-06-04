@@ -25,8 +25,7 @@ impl Plugin for BattlePlugin {
                 .or_else(in_state(NucleotideState::EndOfTurn))
         };
 
-        app.insert_resource(GeneCommandQueue::default())
-            .add_event::<DamageEvent>()
+        app.add_event::<DamageEvent>()
             .add_event::<BlockEvent>()
             .add_event::<GeneProcessingEvent>()
             .add_event::<StatusEffectEvent>()
@@ -48,6 +47,7 @@ impl Plugin for BattlePlugin {
                     .in_schedule(OnEnter(NucleotideState::GeneAnimating)),
                 render_genome_system.in_schedule(OnEnter(NucleotideState::GeneAnimating)),
                 finished_animating_gene_system.run_if(in_state(NucleotideState::GeneAnimating)),
+                clean_up_after_battle.in_schedule(OnEnter(NucleotideState::SelectBattleReward)),
             ));
     }
 }
@@ -107,6 +107,7 @@ fn initialize_battle_system(
     .into_iter()
     .collect();
 
+    commands.insert_resource(GeneCommandQueue::default());
     commands.insert_resource(CharacterTypeToEntity(character_type_to_entity));
 
     queue_next_state_if_not_already_queued(
@@ -412,6 +413,16 @@ fn finished_animating_gene_system(
     );
 }
 
+fn clean_up_after_battle(
+    mut commands: Commands,
+    character_type_to_entity: Res<CharacterTypeToEntity>,
+) {
+    for entity in character_type_to_entity.get_all() {
+        commands.entity(entity).despawn_recursive();
+    }
+    commands.remove_resource::<CharacterActing>();
+    commands.remove_resource::<GeneCommandQueue>();
+}
 // End Systems
 
 // Components

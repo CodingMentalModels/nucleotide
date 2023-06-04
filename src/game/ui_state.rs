@@ -148,6 +148,13 @@ pub struct SelectBattleRewardUIState;
 pub struct SelectGeneFromEnemyUIState;
 
 #[derive(Debug, Default, Clone, PartialEq, Eq, Hash, Resource)]
+pub enum MoveGeneUIState {
+    #[default]
+    FirstSelection,
+    SecondSelection(usize),
+}
+
+#[derive(Debug, Default, Clone, PartialEq, Eq, Hash, Resource)]
 pub enum SwapGenesUIState {
     #[default]
     FirstSelection,

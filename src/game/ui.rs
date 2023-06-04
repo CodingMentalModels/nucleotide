@@ -8,8 +8,8 @@ use crate::game::resources::*;
 
 use super::battle::GenomeComponent;
 use super::ui_state::{
-    CharacterUIState, GameOverUIState, GenomeUIState, InBattleUIState, PausedUIState,
-    SelectBattleRewardUIState, SwapGenesUIState,
+    CharacterUIState, GameOverUIState, GenomeUIState, InBattleUIState, MoveGeneUIState,
+    PausedUIState, SelectBattleRewardUIState, SwapGenesUIState,
 };
 use super::ui_state::{InitializingBattleUIState, SelectGeneFromEnemyUIState};
 
@@ -40,6 +40,7 @@ impl Plugin for UIPlugin {
             render_select_reward_system.run_if(in_state(NucleotideState::SelectBattleReward)),
             render_select_gene_from_enemy_system
                 .run_if(in_state(NucleotideState::SelectGeneFromEnemy)),
+            render_move_gene.run_if(in_state(NucleotideState::MoveGene)),
             render_swap_genes.run_if(in_state(NucleotideState::SwapGenes)),
         ));
 
@@ -50,6 +51,7 @@ impl Plugin for UIPlugin {
         app.insert_resource(PausedUIState::default());
         app.insert_resource(SelectBattleRewardUIState::default());
         app.insert_resource(SelectGeneFromEnemyUIState::default());
+        app.insert_resource(MoveGeneUIState::default());
         app.insert_resource(SwapGenesUIState::default());
         app.insert_resource(GameOverUIState::default());
     }
@@ -153,6 +155,66 @@ fn render_select_gene_from_enemy_system(
         commands.insert_resource(NextState(Some(NucleotideState::InitializingBattle)));
     };
     render_options(&mut contexts, heading, options, on_click, Vec::new());
+}
+
+fn render_move_gene(
+    mut commands: Commands,
+    mut ui_state: ResMut<MoveGeneUIState>,
+    mut contexts: EguiContexts,
+    mut player: ResMut<Player>,
+    character_type_to_entity: Res<CharacterTypeToEntity>,
+) {
+    let genome = player.get_genome();
+    match *ui_state {
+        MoveGeneUIState::FirstSelection => {
+            let on_click = |s: &str| {
+                let gene_index = genome
+                    .iter()
+                    .enumerate()
+                    .filter(|(i, gene)| gene.as_str() == s)
+                    .map(|(i, _)| i)
+                    .next()
+                    .expect("The gene is guaranteed to be there.");
+                *ui_state = MoveGeneUIState::SecondSelection(gene_index)
+            };
+            render_options(
+                &mut contexts,
+                "Choose Gene to Move",
+                genome.clone(),
+                on_click,
+                Vec::new(),
+            );
+        }
+        MoveGeneUIState::SecondSelection(first_selection_index) => {
+            // This is broken because the string is what gets returned and that's not a gene
+            panic!("Broken!");
+            let on_click = |s: &str| {
+                let second_selection_index = genome
+                    .iter()
+                    .enumerate()
+                    .filter(|(_, gene)| gene.as_str() == s)
+                    .map(|(i, _)| i)
+                    .next()
+                    .expect("The gene is guaranteed to be there.");
+                player.move_gene(first_selection_index, second_selection_index);
+                commands.insert_resource(NextState(Some(NucleotideState::InitializingBattle)));
+            };
+            let mut options = vec!["At the Beginning".to_string()];
+            options.append(
+                &mut genome
+                    .iter()
+                    .map(|gene| format!("After {}", gene).to_string())
+                    .collect(),
+            );
+            render_options(
+                &mut contexts,
+                "Choose location to move the Gene to",
+                options,
+                on_click,
+                Vec::new(),
+            );
+        }
+    }
 }
 
 fn render_swap_genes(

@@ -86,8 +86,14 @@ impl Player {
     }
 
     pub fn swap_genes(&mut self, i: usize, j: usize) {
-        assert!(i < self.genome.len() || j < self.genome.len());
+        assert!(i < self.genome.len() && j < self.genome.len());
         self.genome.swap(i, j);
+    }
+
+    pub fn move_gene(&mut self, i: usize, j: usize) {
+        assert!(i < self.genome.len() && j <= self.genome.len());
+        let gene_i = self.genome.remove(i);
+        self.genome.insert(j, gene_i);
     }
 }
 

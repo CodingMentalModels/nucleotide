@@ -97,12 +97,12 @@ fn initialize_battle_system(
         .expect("There should always be more enemies!");
 
     let player_entity = instantiate_player(&mut commands, player);
-    let enemy_entity = instantiate_enemy(&mut commands, enemy, gene_specs, enemy_specs);
+    let enemy_entity = instantiate_enemy(&mut commands, enemy.clone(), gene_specs, enemy_specs);
 
     commands.insert_resource(CharacterActing(player_entity));
     let character_type_to_entity: Vec<_> = vec![
         (CharacterType::Player, player_entity),
-        (CharacterType::Enemy, enemy_entity),
+        (CharacterType::Enemy(enemy), enemy_entity),
     ]
     .into_iter()
     .collect();
@@ -275,7 +275,9 @@ fn handle_damage_system(
                         &mut next_state,
                         NucleotideState::GameOver,
                     ),
-                    CharacterType::Enemy => queue_next_state_if_not_already_queued(
+                    CharacterType::Enemy(_) => queue_next_state_if_not_already_queued(
+                        // TODO: This doesn't handle multiple enemies at all -- if one dies, battle
+                        // over
                         current_state.0,
                         &mut next_state,
                         NucleotideState::SelectBattleReward,
@@ -365,6 +367,7 @@ fn render_character_display_system(
     for (entity, health, block, energy, status_effects, genome) in character_display_query.iter() {
         if character_type_to_entity_map.is_player(entity) {
             ui_state.player_character_state = CharacterUIState::new(
+                "Player".to_string(),
                 energy.energy_remaining,
                 energy.starting_energy,
                 health.0,
@@ -374,6 +377,7 @@ fn render_character_display_system(
             )
         } else if character_type_to_entity_map.is_enemy(entity) {
             ui_state.enemy_character_state = CharacterUIState::new(
+                "Enemy".to_string(),
                 energy.energy_remaining,
                 energy.starting_energy,
                 health.0,

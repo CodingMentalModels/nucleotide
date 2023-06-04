@@ -78,20 +78,26 @@ fn ui_load_system(mut commands: Commands, asset_server: Res<AssetServer>) {
     commands.insert_resource(NextState(Some(NucleotideState::InstantiatingMeta)));
 }
 
-fn render_battle_system(ui_state: Res<InBattleUIState>, mut contexts: EguiContexts) {
+fn render_battle_system(
+    ui_state: Res<InBattleUIState>,
+    mut contexts: EguiContexts,
+    character_type_to_entity: Res<CharacterTypeToEntity>,
+) {
     let player_size = egui::Vec2::new(PLAYER_WINDOW_SIZE.0, PLAYER_WINDOW_SIZE.1);
     let enemy_size = egui::Vec2::new(ENEMY_WINDOW_SIZE.0, ENEMY_WINDOW_SIZE.1);
 
-    let player_state = ui_state.get_character_state(CharacterType::Player);
-    let enemy_state = ui_state.get_character_state(CharacterType::Enemy);
+    let enemy_character_type = character_type_to_entity.get_single_enemy();
 
-    render_player(
+    let player_state = ui_state.get_character_state(&CharacterType::Player);
+    let enemy_state = ui_state.get_character_state(&enemy_character_type);
+
+    render_character(
         &mut contexts,
         player_state,
         CharacterType::Player,
         player_size,
     );
-    render_player(&mut contexts, enemy_state, CharacterType::Enemy, enemy_size);
+    render_character(&mut contexts, enemy_state, enemy_character_type, enemy_size);
 }
 
 fn render_select_reward_system(
@@ -231,7 +237,7 @@ fn render_game_over_system(
 }
 
 // Helper Functions
-fn render_player(
+fn render_character(
     contexts: &mut EguiContexts,
     character_state: CharacterUIState,
     character_type: CharacterType,
@@ -240,13 +246,13 @@ fn render_player(
     let (window_name, heading, anchor, offset) = match character_type {
         CharacterType::Player => (
             "player-window",
-            "Player:",
+            format!("{}:", character_type.to_string()),
             egui::Align2::LEFT_BOTTOM,
             egui::Vec2::new(CHARACTER_WINDOW_OFFSET, -CHARACTER_WINDOW_OFFSET),
         ),
-        CharacterType::Enemy => (
+        CharacterType::Enemy(name) => (
             "enemy-window",
-            "Enemy:",
+            format!("{}:", name),
             egui::Align2::RIGHT_TOP,
             egui::Vec2::new(-CHARACTER_WINDOW_OFFSET, CHARACTER_WINDOW_OFFSET),
         ),

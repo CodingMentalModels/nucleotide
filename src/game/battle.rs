@@ -444,6 +444,10 @@ impl GenomeComponent {
         Self::new(genes, 0, GeneProcessingOrder::Forward, 0)
     }
 
+    pub fn add_gene(&mut self, gene: String) {
+        self.genes.push(gene);
+    }
+
     pub fn get_gene_ui_states(&self, gene_spec_lookup: &GeneSpecLookup) -> Vec<GeneUIState> {
         self.genes
             .iter()

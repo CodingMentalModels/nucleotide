@@ -6,6 +6,7 @@ use egui::{RichText, Ui};
 use crate::game::constants::*;
 use crate::game::resources::*;
 
+use super::battle::GenomeComponent;
 use super::ui_state::{
     CharacterUIState, GameOverUIState, GenomeUIState, InBattleUIState, PausedUIState,
     SelectBattleRewardUIState,
@@ -47,6 +48,7 @@ impl Plugin for UIPlugin {
         ));
         app.insert_resource(PausedUIState::default());
         app.insert_resource(SelectBattleRewardUIState::default());
+        app.insert_resource(SelectGeneFromEnemyUIState::default());
         app.insert_resource(GameOverUIState::default());
     }
 }
@@ -99,14 +101,14 @@ fn render_select_reward_system(
 ) {
     let heading = "Select Battle Reward";
     let options = vec![
-        "Choose new Gene from Enemy",
-        "Move a Gene",
-        "Swap two Genes",
-        "Research a Gene",
+        "Choose new Gene from Enemy".to_string(),
+        "Move a Gene".to_string(),
+        "Swap two Genes".to_string(),
+        "Research a Gene".to_string(),
     ];
     let on_click = |s: &str| match s {
         "Choose new Gene from Enemy" => {
-            commands.insert_resource(NextState(Some(NucleotideState::SelectBattleReward)))
+            commands.insert_resource(NextState(Some(NucleotideState::SelectGeneFromEnemy)))
         }
         "Move a Gene" => commands.insert_resource(NextState(Some(NucleotideState::MoveGene))),
         "Swap two Genes" => commands.insert_resource(NextState(Some(NucleotideState::SwapGene))),
@@ -121,24 +123,46 @@ fn render_select_reward_system(
 fn render_select_gene_from_enemy_system(
     ui_state: Res<SelectGeneFromEnemyUIState>,
     mut contexts: EguiContexts,
-    enemy_genome_query: Query<Entity, &GenomeComponent>,
+    mut genome_query: Query<(Entity, &mut GenomeComponent)>,
     character_type_to_entity: Res<CharacterTypeToEntity>,
 ) {
     let heading = "Select Gene from Enemy";
-    let enemy_genome = enemy_genome_query
+    let (maybe_player_genome, maybe_enemy_genome) = genome_query
+        .iter_mut()
         .map(|(entity, genome)| {
-            if character_type_to_entity.is_enemy(entity) {
-                Some(genome)
+            if character_type_to_entity.is_player(entity) {
+                (Some(genome), None)
+            } else if character_type_to_entity.is_enemy(entity) {
+                (None, Some(genome))
             } else {
-                None
+                (None, None)
             }
         })
-        .flatten()
-        .first()
-        .expect("There should always be at least one enemy.");
-    // We need to get the player genome as well, then based on the gene symbol chosen, add that
-    // gene to the player genome
-    let on_click = |s: &str| match s {};
+        .fold((None, None), |mut acc, e| {
+            if e.0.is_some() {
+                assert!(acc.0.is_none());
+                acc.0 = e.0;
+            }
+            if e.1.is_some() {
+                assert!(acc.1.is_none());
+                acc.1 = e.1;
+            }
+            acc
+        });
+
+    let mut player_genome = maybe_player_genome.expect("Player genome should exist.");
+    let enemy_genome = maybe_enemy_genome.expect("Enemy genome should exist.");
+
+    let options = enemy_genome.get_genes();
+    let options_clone = options.clone();
+    let on_click = |s: &str| {
+        let gene = options_clone
+            .iter()
+            .filter(|gene| gene.as_str() == s)
+            .next()
+            .expect("The gene is guaranteed to be there.");
+        player_genome.add_gene(gene.clone());
+    };
     render_options(&mut contexts, heading, options, on_click);
 }
 
@@ -263,7 +287,7 @@ fn render_player(
 fn render_options(
     contexts: &mut EguiContexts,
     heading: &str,
-    options: Vec<&str>,
+    options: Vec<String>,
     mut on_click: impl FnMut(&str) -> (),
 ) {
     egui::CentralPanel::default().show(contexts.ctx_mut(), |ui| {
@@ -271,14 +295,14 @@ fn render_options(
         ui.separator();
 
         let n_columns = options.len();
-        let button_size = egui::Vec2::new(100.0, 200.0);
+        let button_size = egui::Vec2::new(OPTION_CARD_SIZE.0, OPTION_CARD_SIZE.1);
         ui.columns(n_columns, |columns| {
             for i in 0..n_columns {
                 if columns[i]
-                    .add(egui::Button::new(options[i]).min_size(button_size.into()))
+                    .add(egui::Button::new(options[i].clone()).min_size(button_size.into()))
                     .clicked()
                 {
-                    on_click(options[i]);
+                    on_click(options[i].as_str());
                 }
             }
         });

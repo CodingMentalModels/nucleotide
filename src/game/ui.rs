@@ -278,7 +278,7 @@ fn render_initializing_battle_system(
             ui.with_layout(egui::Layout::top_down(egui::Align::Center), |ui| {
                 ui.label(
                     egui::RichText::new("Initializing Battle")
-                        .size(20.)
+                        .size(DEFAULT_FONT_SIZE)
                         .text_style(egui::TextStyle::Heading)
                         .underline()
                         .color(egui::Color32::BLACK),
@@ -287,18 +287,14 @@ fn render_initializing_battle_system(
         });
 }
 
-fn render_paused_system(
-    ui_state: Res<PausedUIState>,
-    loaded_font: Res<LoadedFont>,
-    mut contexts: EguiContexts,
-) {
+fn render_paused_system(ui_state: Res<PausedUIState>, mut contexts: EguiContexts) {
     egui::Area::new("pause-menu")
         .anchor(egui::Align2::CENTER_CENTER, egui::Vec2::ZERO)
         .show(contexts.ctx_mut(), |ui| {
             ui.with_layout(egui::Layout::top_down(egui::Align::Center), |ui| {
                 ui.label(
                     egui::RichText::new("Paused")
-                        .size(20.)
+                        .size(DEFAULT_FONT_SIZE)
                         .text_style(egui::TextStyle::Heading)
                         .underline()
                         .color(egui::Color32::BLACK),
@@ -307,18 +303,14 @@ fn render_paused_system(
         });
 }
 
-fn render_game_over_system(
-    ui_state: Res<GameOverUIState>,
-    loaded_font: Res<LoadedFont>,
-    mut contexts: EguiContexts,
-) {
+fn render_game_over_system(ui_state: Res<GameOverUIState>, mut contexts: EguiContexts) {
     egui::Area::new("game-over-menu")
         .anchor(egui::Align2::CENTER_CENTER, egui::Vec2::ZERO)
         .show(contexts.ctx_mut(), |ui| {
             ui.with_layout(egui::Layout::top_down(egui::Align::Center), |ui| {
                 ui.label(
                     egui::RichText::new("Game Over")
-                        .size(20.)
+                        .size(DEFAULT_FONT_SIZE)
                         .text_style(egui::TextStyle::Heading)
                         .underline()
                         .color(egui::Color32::BLACK),
@@ -356,25 +348,34 @@ fn render_character(
         .default_size(size)
         .fixed_size(size)
         .show(contexts.ctx_mut(), |ui| {
-            ui.label(heading);
-            ui.label(format!(
+            ui.label(get_default_text(heading));
+            ui.label(get_default_text(format!(
                 "Energy: {}/{}",
                 character_state.energy_remaining, character_state.total_energy
-            ));
-            ui.label(format!("Health: {}", character_state.health));
-            ui.label(format!("Block: {}", character_state.block));
+            )));
+            ui.label(get_default_text(format!(
+                "Health: {}",
+                character_state.health
+            )));
+            ui.label(get_default_text(format!(
+                "Block: {}",
+                character_state.block
+            )));
             for (effect, amount) in &character_state.status_effects {
-                ui.label(format!("Effect: {:?} x{:?}", effect, amount));
+                ui.label(get_default_text(format!(
+                    "Effect: {:?} x{:?}",
+                    effect, amount
+                )));
             }
 
             // Display the genome state.
-            ui.label("Genome:");
+            ui.label(get_default_text("Genome:".to_string()));
             ui.horizontal(|ui| {
                 for gene_state in &character_state.genome.genes {
                     let gene_text = if gene_state.is_active {
-                        RichText::new(gene_state.gene.to_string()).color(egui::Color32::GREEN)
+                        get_default_text(gene_state.gene.to_string()).color(egui::Color32::GREEN)
                     } else {
-                        RichText::new(gene_state.gene.to_string())
+                        get_default_text(gene_state.gene.to_string())
                     };
                     let gene_label = ui.label(gene_text);
                     if gene_label.hovered() {
@@ -401,9 +402,11 @@ fn render_options(
         ui.columns(n_columns, |columns| {
             for i in 0..n_columns {
                 let text = if highlighted_options.contains(&i) {
-                    egui::RichText::new(options[i].clone()).color(egui::Color32::GREEN)
-                } else {
                     egui::RichText::new(options[i].clone())
+                        .color(egui::Color32::GREEN)
+                        .size(DEFAULT_FONT_SIZE)
+                } else {
+                    egui::RichText::new(options[i].clone()).size(DEFAULT_FONT_SIZE)
                 };
                 if columns[i]
                     .add(egui::Button::new(text).min_size(button_size.into()))
@@ -414,5 +417,9 @@ fn render_options(
             }
         });
     });
+}
+
+fn get_default_text(s: String) -> egui::RichText {
+    egui::RichText::new(s).size(DEFAULT_FONT_SIZE)
 }
 // End Helper Functions

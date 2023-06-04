@@ -32,7 +32,7 @@ pub enum NucleotideState {
     SelectBattleReward,
     SelectGeneFromEnemy,
     MoveGene,
-    SwapGene,
+    SwapGenes,
     ResearchGene,
     GameOver,
     Victory,
@@ -83,6 +83,11 @@ impl Player {
 
     pub fn add_gene(&mut self, gene: GeneName) {
         self.genome.push(gene);
+    }
+
+    pub fn swap_genes(&mut self, i: usize, j: usize) {
+        assert!(i < self.genome.len() || j < self.genome.len());
+        self.genome.swap(i, j);
     }
 }
 

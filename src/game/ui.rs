@@ -9,7 +9,7 @@ use crate::game::resources::*;
 use super::battle::GenomeComponent;
 use super::ui_state::{
     CharacterUIState, GameOverUIState, GenomeUIState, InBattleUIState, PausedUIState,
-    SelectBattleRewardUIState,
+    SelectBattleRewardUIState, SwapGenesUIState,
 };
 use super::ui_state::{InitializingBattleUIState, SelectGeneFromEnemyUIState};
 
@@ -40,6 +40,7 @@ impl Plugin for UIPlugin {
             render_select_reward_system.run_if(in_state(NucleotideState::SelectBattleReward)),
             render_select_gene_from_enemy_system
                 .run_if(in_state(NucleotideState::SelectGeneFromEnemy)),
+            render_swap_genes.run_if(in_state(NucleotideState::SwapGenes)),
         ));
 
         app.insert_resource(InitializingBattleUIState::default());
@@ -49,6 +50,7 @@ impl Plugin for UIPlugin {
         app.insert_resource(PausedUIState::default());
         app.insert_resource(SelectBattleRewardUIState::default());
         app.insert_resource(SelectGeneFromEnemyUIState::default());
+        app.insert_resource(SwapGenesUIState::default());
         app.insert_resource(GameOverUIState::default());
     }
 }
@@ -117,13 +119,13 @@ fn render_select_reward_system(
             commands.insert_resource(NextState(Some(NucleotideState::SelectGeneFromEnemy)))
         }
         "Move a Gene" => commands.insert_resource(NextState(Some(NucleotideState::MoveGene))),
-        "Swap two Genes" => commands.insert_resource(NextState(Some(NucleotideState::SwapGene))),
+        "Swap two Genes" => commands.insert_resource(NextState(Some(NucleotideState::SwapGenes))),
         "Research a Gene" => {
             commands.insert_resource(NextState(Some(NucleotideState::ResearchGene)))
         }
         v => panic!("Bad value: {}", v),
     };
-    render_options(&mut contexts, heading, options, on_click);
+    render_options(&mut contexts, heading, options, on_click, Vec::new());
 }
 
 fn render_select_gene_from_enemy_system(
@@ -150,12 +152,62 @@ fn render_select_gene_from_enemy_system(
         player.add_gene(gene.clone());
         commands.insert_resource(NextState(Some(NucleotideState::InitializingBattle)));
     };
-    render_options(&mut contexts, heading, options, on_click);
+    render_options(&mut contexts, heading, options, on_click, Vec::new());
+}
+
+fn render_swap_genes(
+    mut commands: Commands,
+    mut ui_state: ResMut<SwapGenesUIState>,
+    mut contexts: EguiContexts,
+    mut player: ResMut<Player>,
+    character_type_to_entity: Res<CharacterTypeToEntity>,
+) {
+    let genome = player.get_genome();
+    match *ui_state {
+        SwapGenesUIState::FirstSelection => {
+            let on_click = |s: &str| {
+                let gene_index = genome
+                    .iter()
+                    .enumerate()
+                    .filter(|(i, gene)| gene.as_str() == s)
+                    .map(|(i, _)| i)
+                    .next()
+                    .expect("The gene is guaranteed to be there.");
+                *ui_state = SwapGenesUIState::SecondSelection(gene_index)
+            };
+            render_options(
+                &mut contexts,
+                "Choose First Gene to Swap",
+                genome.clone(),
+                on_click,
+                Vec::new(),
+            );
+        }
+        SwapGenesUIState::SecondSelection(first_selection_index) => {
+            let on_click = |s: &str| {
+                let second_selection_index = genome
+                    .iter()
+                    .enumerate()
+                    .filter(|(_, gene)| gene.as_str() == s)
+                    .map(|(i, _)| i)
+                    .next()
+                    .expect("The gene is guaranteed to be there.");
+                player.swap_genes(first_selection_index, second_selection_index);
+                commands.insert_resource(NextState(Some(NucleotideState::InitializingBattle)));
+            };
+            render_options(
+                &mut contexts,
+                "Choose Second Gene to Swap",
+                genome.clone(),
+                on_click,
+                vec![first_selection_index],
+            );
+        }
+    }
 }
 
 fn render_initializing_battle_system(
     ui_state: Res<InitializingBattleUIState>,
-    loaded_font: Res<LoadedFont>,
     mut contexts: EguiContexts,
 ) {
     egui::Area::new("initiazing-battle-screen")
@@ -276,6 +328,7 @@ fn render_options(
     heading: &str,
     options: Vec<String>,
     mut on_click: impl FnMut(&str) -> (),
+    highlighted_options: Vec<usize>,
 ) {
     egui::CentralPanel::default().show(contexts.ctx_mut(), |ui| {
         ui.heading(heading);
@@ -285,8 +338,13 @@ fn render_options(
         let button_size = egui::Vec2::new(OPTION_CARD_SIZE.0, OPTION_CARD_SIZE.1);
         ui.columns(n_columns, |columns| {
             for i in 0..n_columns {
+                let text = if highlighted_options.contains(&i) {
+                    egui::RichText::new(options[i].clone()).color(egui::Color32::GREEN)
+                } else {
+                    egui::RichText::new(options[i].clone())
+                };
                 if columns[i]
-                    .add(egui::Button::new(options[i].clone()).min_size(button_size.into()))
+                    .add(egui::Button::new(text).min_size(button_size.into()))
                     .clicked()
                 {
                     on_click(options[i].as_str());

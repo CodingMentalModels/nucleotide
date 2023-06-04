@@ -121,9 +121,11 @@ fn render_select_reward_system(
 }
 
 fn render_select_gene_from_enemy_system(
+    mut commands: Commands,
     ui_state: Res<SelectGeneFromEnemyUIState>,
     mut contexts: EguiContexts,
     mut genome_query: Query<(Entity, &mut GenomeComponent)>,
+    mut player: ResMut<Player>,
     character_type_to_entity: Res<CharacterTypeToEntity>,
 ) {
     let heading = "Select Gene from Enemy";
@@ -162,6 +164,8 @@ fn render_select_gene_from_enemy_system(
             .next()
             .expect("The gene is guaranteed to be there.");
         player_genome.add_gene(gene.clone());
+        player.add_gene(gene.clone());
+        commands.insert_resource(NextState(Some(NucleotideState::InitializingBattle)));
     };
     render_options(&mut contexts, heading, options, on_click);
 }

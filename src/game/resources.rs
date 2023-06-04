@@ -80,6 +80,10 @@ impl Player {
     pub fn get_genome(&self) -> Vec<GeneName> {
         self.genome.clone()
     }
+
+    pub fn add_gene(&mut self, gene: GeneName) {
+        self.genome.push(gene);
+    }
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash, Resource)]

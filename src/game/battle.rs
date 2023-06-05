@@ -92,9 +92,13 @@ fn initialize_battle_system(
     current_state: Res<State<NucleotideState>>,
     mut next_state: ResMut<NextState<NucleotideState>>,
 ) {
-    let enemy = enemy_queue
-        .pop()
-        .expect("There should always be more enemies!");
+    let enemy = match enemy_queue.pop() {
+        Some(enemy) => enemy,
+        None => {
+            commands.insert_resource(NextState(Some(NucleotideState::Victory)));
+            return;
+        }
+    };
 
     let player_entity = instantiate_player(&mut commands, player);
     let enemy_entity = instantiate_enemy(&mut commands, enemy.clone(), gene_specs, enemy_specs);

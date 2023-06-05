@@ -9,7 +9,7 @@ use crate::game::resources::*;
 use super::battle::GenomeComponent;
 use super::ui_state::{
     CharacterUIState, GameOverUIState, GenomeUIState, InBattleUIState, MoveGeneUIState,
-    PausedUIState, SelectBattleRewardUIState, SwapGenesUIState,
+    PausedUIState, SelectBattleRewardUIState, SwapGenesUIState, VictoryUIState,
 };
 use super::ui_state::{InitializingBattleUIState, SelectGeneFromEnemyUIState};
 
@@ -37,6 +37,8 @@ impl Plugin for UIPlugin {
             render_initializing_battle_system.run_if(in_state(NucleotideState::InitializingBattle)),
             render_battle_system.run_if(get_battle_states_condition()),
             render_paused_system.run_if(in_state(NucleotideState::Paused)),
+            render_game_over_system.run_if(in_state(NucleotideState::GameOver)),
+            render_victory_system.run_if(in_state(NucleotideState::Victory)),
             render_select_reward_system.run_if(in_state(NucleotideState::SelectBattleReward)),
             render_select_gene_from_enemy_system
                 .run_if(in_state(NucleotideState::SelectGeneFromEnemy)),
@@ -54,6 +56,7 @@ impl Plugin for UIPlugin {
         app.insert_resource(MoveGeneUIState::default());
         app.insert_resource(SwapGenesUIState::default());
         app.insert_resource(GameOverUIState::default());
+        app.insert_resource(VictoryUIState::default());
     }
 }
 
@@ -290,6 +293,21 @@ fn render_game_over_system(ui_state: Res<GameOverUIState>, mut contexts: EguiCon
         });
 }
 
+fn render_victory_system(ui_state: Res<VictoryUIState>, mut contexts: EguiContexts) {
+    egui::Area::new("victory-menu")
+        .anchor(egui::Align2::CENTER_CENTER, egui::Vec2::ZERO)
+        .show(contexts.ctx_mut(), |ui| {
+            ui.with_layout(egui::Layout::top_down(egui::Align::Center), |ui| {
+                ui.label(
+                    egui::RichText::new("Victory!")
+                        .size(DEFAULT_FONT_SIZE)
+                        .text_style(egui::TextStyle::Heading)
+                        .underline()
+                        .color(egui::Color32::LIGHT_BLUE),
+                );
+            });
+        });
+}
 // Helper Functions
 fn render_character(
     contexts: &mut EguiContexts,

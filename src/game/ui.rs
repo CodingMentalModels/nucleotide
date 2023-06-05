@@ -116,15 +116,11 @@ fn render_select_reward_system(
         "Swap two Genes".to_string(),
         "Research a Gene".to_string(),
     ];
-    let on_click = |s: &str| match s {
-        "Choose new Gene from Enemy" => {
-            commands.insert_resource(NextState(Some(NucleotideState::SelectGeneFromEnemy)))
-        }
-        "Move a Gene" => commands.insert_resource(NextState(Some(NucleotideState::MoveGene))),
-        "Swap two Genes" => commands.insert_resource(NextState(Some(NucleotideState::SwapGenes))),
-        "Research a Gene" => {
-            commands.insert_resource(NextState(Some(NucleotideState::ResearchGene)))
-        }
+    let on_click = |s: usize| match s {
+        0 => commands.insert_resource(NextState(Some(NucleotideState::SelectGeneFromEnemy))),
+        1 => commands.insert_resource(NextState(Some(NucleotideState::MoveGene))),
+        2 => commands.insert_resource(NextState(Some(NucleotideState::SwapGenes))),
+        3 => commands.insert_resource(NextState(Some(NucleotideState::ResearchGene))),
         v => panic!("Bad value: {}", v),
     };
     render_options(&mut contexts, heading, options, on_click, Vec::new());
@@ -145,12 +141,12 @@ fn render_select_gene_from_enemy_system(
     let enemy_genome = enemy_specs.get(enemy_name).get_genome();
 
     let options = enemy_genome.clone();
-    let on_click = |s: &str| {
-        let gene = enemy_genome
-            .iter()
-            .filter(|gene| gene.as_str() == s)
-            .next()
-            .expect("The gene is guaranteed to be there.");
+    let on_click = |i: usize| {
+        assert!(
+            i < enemy_genome.len(),
+            "The gene is guaranteed to be there."
+        );
+        let gene = enemy_genome[i].clone();
         player.add_gene(gene.clone());
         commands.insert_resource(NextState(Some(NucleotideState::InitializingBattle)));
     };
@@ -164,18 +160,12 @@ fn render_move_gene(
     mut player: ResMut<Player>,
     character_type_to_entity: Res<CharacterTypeToEntity>,
 ) {
-    let genome = player.get_genome();
+    let mut genome = player.get_genome();
     match *ui_state {
         MoveGeneUIState::FirstSelection => {
-            let on_click = |s: &str| {
-                let gene_index = genome
-                    .iter()
-                    .enumerate()
-                    .filter(|(i, gene)| gene.as_str() == s)
-                    .map(|(i, _)| i)
-                    .next()
-                    .expect("The gene is guaranteed to be there.");
-                *ui_state = MoveGeneUIState::SecondSelection(gene_index)
+            let on_click = |i: usize| {
+                assert!(i < genome.len(), "The gene is guaranteed to be there.");
+                *ui_state = MoveGeneUIState::SecondSelection(i)
             };
             render_options(
                 &mut contexts,
@@ -187,19 +177,12 @@ fn render_move_gene(
         }
         MoveGeneUIState::SecondSelection(first_selection_index) => {
             // This is broken because the string is what gets returned and that's not a gene
-            panic!("Broken!");
-            let on_click = |s: &str| {
-                let second_selection_index = genome
-                    .iter()
-                    .enumerate()
-                    .filter(|(_, gene)| gene.as_str() == s)
-                    .map(|(i, _)| i)
-                    .next()
-                    .expect("The gene is guaranteed to be there.");
-                player.move_gene(first_selection_index, second_selection_index);
+            let on_click = |i: usize| {
+                player.move_gene(first_selection_index, i);
                 commands.insert_resource(NextState(Some(NucleotideState::InitializingBattle)));
             };
             let mut options = vec!["At the Beginning".to_string()];
+            genome.remove(first_selection_index);
             options.append(
                 &mut genome
                     .iter()
@@ -227,15 +210,9 @@ fn render_swap_genes(
     let genome = player.get_genome();
     match *ui_state {
         SwapGenesUIState::FirstSelection => {
-            let on_click = |s: &str| {
-                let gene_index = genome
-                    .iter()
-                    .enumerate()
-                    .filter(|(i, gene)| gene.as_str() == s)
-                    .map(|(i, _)| i)
-                    .next()
-                    .expect("The gene is guaranteed to be there.");
-                *ui_state = SwapGenesUIState::SecondSelection(gene_index)
+            let on_click = |i: usize| {
+                assert!(i < genome.len(), "The gene is guaranteed to be there.");
+                *ui_state = SwapGenesUIState::SecondSelection(i)
             };
             render_options(
                 &mut contexts,
@@ -246,15 +223,9 @@ fn render_swap_genes(
             );
         }
         SwapGenesUIState::SecondSelection(first_selection_index) => {
-            let on_click = |s: &str| {
-                let second_selection_index = genome
-                    .iter()
-                    .enumerate()
-                    .filter(|(_, gene)| gene.as_str() == s)
-                    .map(|(i, _)| i)
-                    .next()
-                    .expect("The gene is guaranteed to be there.");
-                player.swap_genes(first_selection_index, second_selection_index);
+            let on_click = |i: usize| {
+                assert!(i < genome.len(), "The gene is guaranteed to be there.");
+                player.swap_genes(first_selection_index, i);
                 commands.insert_resource(NextState(Some(NucleotideState::InitializingBattle)));
             };
             render_options(
@@ -390,7 +361,7 @@ fn render_options(
     contexts: &mut EguiContexts,
     heading: &str,
     options: Vec<String>,
-    mut on_click: impl FnMut(&str) -> (),
+    mut on_click: impl FnMut(usize) -> (),
     highlighted_options: Vec<usize>,
 ) {
     egui::CentralPanel::default().show(contexts.ctx_mut(), |ui| {
@@ -412,7 +383,7 @@ fn render_options(
                     .add(egui::Button::new(text).min_size(button_size.into()))
                     .clicked()
                 {
-                    on_click(options[i].as_str());
+                    on_click(i);
                 }
             }
         });

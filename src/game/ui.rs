@@ -120,7 +120,7 @@ fn render_select_reward_system(
         0 => commands.insert_resource(NextState(Some(NucleotideState::SelectGeneFromEnemy))),
         1 => commands.insert_resource(NextState(Some(NucleotideState::MoveGene))),
         2 => commands.insert_resource(NextState(Some(NucleotideState::SwapGenes))),
-        3 => commands.insert_resource(NextState(Some(NucleotideState::ResearchGene))),
+        3 => {}
         v => panic!("Bad value: {}", v),
     };
     render_options(&mut contexts, heading, options, on_click, Vec::new());

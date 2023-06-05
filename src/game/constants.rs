@@ -11,6 +11,8 @@ pub const STARTING_PLAYER_HEALTH: u8 = 100;
 pub const PLAYER_WINDOW_SIZE: (f32, f32) = (300.0, 200.0);
 pub const ENEMY_WINDOW_SIZE: (f32, f32) = (150.0, 100.0);
 pub const CHARACTER_WINDOW_OFFSET: f32 = 20.;
+pub const OPTION_CARD_SIZE: (f32, f32) = (100., 200.);
+pub const DEFAULT_FONT_SIZE: f32 = 28.;
 
 // Greek Letters
 pub const ALPHA_LOWER: char = 'α';

@@ -6,11 +6,12 @@ use egui::{RichText, Ui};
 use crate::game::constants::*;
 use crate::game::resources::*;
 
-use super::ui_state::InitializingBattleUIState;
+use super::battle::GenomeComponent;
 use super::ui_state::{
-    CharacterUIState, GameOverUIState, GenomeUIState, InBattleUIState, PausedUIState,
-    SelectBattleRewardUIState,
+    CharacterUIState, GameOverUIState, GenomeUIState, InBattleUIState, MoveGeneUIState,
+    PausedUIState, SelectBattleRewardUIState, SwapGenesUIState, VictoryUIState,
 };
+use super::ui_state::{InitializingBattleUIState, SelectGeneFromEnemyUIState};
 
 pub struct UIPlugin;
 
@@ -36,7 +37,13 @@ impl Plugin for UIPlugin {
             render_initializing_battle_system.run_if(in_state(NucleotideState::InitializingBattle)),
             render_battle_system.run_if(get_battle_states_condition()),
             render_paused_system.run_if(in_state(NucleotideState::Paused)),
+            render_game_over_system.run_if(in_state(NucleotideState::GameOver)),
+            render_victory_system.run_if(in_state(NucleotideState::Victory)),
             render_select_reward_system.run_if(in_state(NucleotideState::SelectBattleReward)),
+            render_select_gene_from_enemy_system
+                .run_if(in_state(NucleotideState::SelectGeneFromEnemy)),
+            render_move_gene.run_if(in_state(NucleotideState::MoveGene)),
+            render_swap_genes.run_if(in_state(NucleotideState::SwapGenes)),
         ));
 
         app.insert_resource(InitializingBattleUIState::default());
@@ -45,7 +52,11 @@ impl Plugin for UIPlugin {
         ));
         app.insert_resource(PausedUIState::default());
         app.insert_resource(SelectBattleRewardUIState::default());
+        app.insert_resource(SelectGeneFromEnemyUIState::default());
+        app.insert_resource(MoveGeneUIState::default());
+        app.insert_resource(SwapGenesUIState::default());
         app.insert_resource(GameOverUIState::default());
+        app.insert_resource(VictoryUIState::default());
     }
 }
 
@@ -74,45 +85,165 @@ fn ui_load_system(mut commands: Commands, asset_server: Res<AssetServer>) {
     commands.insert_resource(NextState(Some(NucleotideState::InstantiatingMeta)));
 }
 
-fn render_battle_system(ui_state: Res<InBattleUIState>, mut contexts: EguiContexts) {
+fn render_battle_system(
+    ui_state: Res<InBattleUIState>,
+    mut contexts: EguiContexts,
+    character_type_to_entity: Res<CharacterTypeToEntity>,
+) {
     let player_size = egui::Vec2::new(PLAYER_WINDOW_SIZE.0, PLAYER_WINDOW_SIZE.1);
     let enemy_size = egui::Vec2::new(ENEMY_WINDOW_SIZE.0, ENEMY_WINDOW_SIZE.1);
 
-    let player_state = ui_state.get_character_state(CharacterType::Player);
-    let enemy_state = ui_state.get_character_state(CharacterType::Enemy);
+    let enemy_character_type = character_type_to_entity.get_single_enemy();
 
-    render_player(
+    let player_state = ui_state.get_character_state(&CharacterType::Player);
+    let enemy_state = ui_state.get_character_state(&enemy_character_type);
+
+    render_character(
         &mut contexts,
         player_state,
         CharacterType::Player,
         player_size,
     );
-    render_player(&mut contexts, enemy_state, CharacterType::Enemy, enemy_size);
+    render_character(&mut contexts, enemy_state, enemy_character_type, enemy_size);
 }
 
 fn render_select_reward_system(
+    mut commands: Commands,
     ui_state: Res<SelectBattleRewardUIState>,
-    loaded_font: Res<LoadedFont>,
     mut contexts: EguiContexts,
 ) {
-    egui::Area::new("select-battle-reward-menu")
-        .anchor(egui::Align2::CENTER_CENTER, egui::Vec2::ZERO)
-        .show(contexts.ctx_mut(), |ui| {
-            ui.with_layout(egui::Layout::top_down(egui::Align::Center), |ui| {
-                ui.label(
-                    egui::RichText::new("Select Battle Reward")
-                        .size(20.)
-                        .text_style(egui::TextStyle::Heading)
-                        .underline()
-                        .color(egui::Color32::BLACK),
-                );
-            });
-        });
+    let heading = "Select Battle Reward";
+    let options = vec![
+        "Choose new Gene from Enemy".to_string(),
+        "Move a Gene".to_string(),
+        "Swap two Genes".to_string(),
+        "Research a Gene".to_string(),
+    ];
+    let on_click = |s: usize| match s {
+        0 => commands.insert_resource(NextState(Some(NucleotideState::SelectGeneFromEnemy))),
+        1 => commands.insert_resource(NextState(Some(NucleotideState::MoveGene))),
+        2 => commands.insert_resource(NextState(Some(NucleotideState::SwapGenes))),
+        3 => {}
+        v => panic!("Bad value: {}", v),
+    };
+    render_options(&mut contexts, heading, options, on_click, Vec::new());
+}
+
+fn render_select_gene_from_enemy_system(
+    mut commands: Commands,
+    ui_state: Res<SelectGeneFromEnemyUIState>,
+    mut contexts: EguiContexts,
+    mut player: ResMut<Player>,
+    enemy_specs: Res<EnemySpecs>,
+    character_type_to_entity: Res<CharacterTypeToEntity>,
+) {
+    let heading = "Select Gene from Enemy";
+
+    let enemy_character_type = character_type_to_entity.get_single_enemy();
+    let enemy_name = enemy_character_type.to_string();
+    let enemy_genome = enemy_specs.get(enemy_name).get_genome();
+
+    let options = enemy_genome.clone();
+    let on_click = |i: usize| {
+        assert!(
+            i < enemy_genome.len(),
+            "The gene is guaranteed to be there."
+        );
+        let gene = enemy_genome[i].clone();
+        player.add_gene(gene.clone());
+        commands.insert_resource(NextState(Some(NucleotideState::InitializingBattle)));
+    };
+    render_options(&mut contexts, heading, options, on_click, Vec::new());
+}
+
+fn render_move_gene(
+    mut commands: Commands,
+    mut ui_state: ResMut<MoveGeneUIState>,
+    mut contexts: EguiContexts,
+    mut player: ResMut<Player>,
+    character_type_to_entity: Res<CharacterTypeToEntity>,
+) {
+    let mut genome = player.get_genome();
+    match *ui_state {
+        MoveGeneUIState::FirstSelection => {
+            let on_click = |i: usize| {
+                assert!(i < genome.len(), "The gene is guaranteed to be there.");
+                *ui_state = MoveGeneUIState::SecondSelection(i)
+            };
+            render_options(
+                &mut contexts,
+                "Choose Gene to Move",
+                genome.clone(),
+                on_click,
+                Vec::new(),
+            );
+        }
+        MoveGeneUIState::SecondSelection(first_selection_index) => {
+            // This is broken because the string is what gets returned and that's not a gene
+            let on_click = |i: usize| {
+                player.move_gene(first_selection_index, i);
+                commands.insert_resource(NextState(Some(NucleotideState::InitializingBattle)));
+            };
+            let mut options = vec!["At the Beginning".to_string()];
+            genome.remove(first_selection_index);
+            options.append(
+                &mut genome
+                    .iter()
+                    .map(|gene| format!("After {}", gene).to_string())
+                    .collect(),
+            );
+            render_options(
+                &mut contexts,
+                "Choose location to move the Gene to",
+                options,
+                on_click,
+                Vec::new(),
+            );
+        }
+    }
+}
+
+fn render_swap_genes(
+    mut commands: Commands,
+    mut ui_state: ResMut<SwapGenesUIState>,
+    mut contexts: EguiContexts,
+    mut player: ResMut<Player>,
+    character_type_to_entity: Res<CharacterTypeToEntity>,
+) {
+    let genome = player.get_genome();
+    match *ui_state {
+        SwapGenesUIState::FirstSelection => {
+            let on_click = |i: usize| {
+                assert!(i < genome.len(), "The gene is guaranteed to be there.");
+                *ui_state = SwapGenesUIState::SecondSelection(i)
+            };
+            render_options(
+                &mut contexts,
+                "Choose First Gene to Swap",
+                genome.clone(),
+                on_click,
+                Vec::new(),
+            );
+        }
+        SwapGenesUIState::SecondSelection(first_selection_index) => {
+            let on_click = |i: usize| {
+                assert!(i < genome.len(), "The gene is guaranteed to be there.");
+                player.swap_genes(first_selection_index, i);
+                commands.insert_resource(NextState(Some(NucleotideState::InitializingBattle)));
+            };
+            render_options(
+                &mut contexts,
+                "Choose Second Gene to Swap",
+                genome.clone(),
+                on_click,
+                vec![first_selection_index],
+            );
+        }
+    }
 }
 
 fn render_initializing_battle_system(
     ui_state: Res<InitializingBattleUIState>,
-    loaded_font: Res<LoadedFont>,
     mut contexts: EguiContexts,
 ) {
     egui::Area::new("initiazing-battle-screen")
@@ -121,7 +252,7 @@ fn render_initializing_battle_system(
             ui.with_layout(egui::Layout::top_down(egui::Align::Center), |ui| {
                 ui.label(
                     egui::RichText::new("Initializing Battle")
-                        .size(20.)
+                        .size(DEFAULT_FONT_SIZE)
                         .text_style(egui::TextStyle::Heading)
                         .underline()
                         .color(egui::Color32::BLACK),
@@ -130,18 +261,14 @@ fn render_initializing_battle_system(
         });
 }
 
-fn render_paused_system(
-    ui_state: Res<PausedUIState>,
-    loaded_font: Res<LoadedFont>,
-    mut contexts: EguiContexts,
-) {
+fn render_paused_system(ui_state: Res<PausedUIState>, mut contexts: EguiContexts) {
     egui::Area::new("pause-menu")
         .anchor(egui::Align2::CENTER_CENTER, egui::Vec2::ZERO)
         .show(contexts.ctx_mut(), |ui| {
             ui.with_layout(egui::Layout::top_down(egui::Align::Center), |ui| {
                 ui.label(
                     egui::RichText::new("Paused")
-                        .size(20.)
+                        .size(DEFAULT_FONT_SIZE)
                         .text_style(egui::TextStyle::Heading)
                         .underline()
                         .color(egui::Color32::BLACK),
@@ -150,18 +277,14 @@ fn render_paused_system(
         });
 }
 
-fn render_game_over_system(
-    ui_state: Res<GameOverUIState>,
-    loaded_font: Res<LoadedFont>,
-    mut contexts: EguiContexts,
-) {
+fn render_game_over_system(ui_state: Res<GameOverUIState>, mut contexts: EguiContexts) {
     egui::Area::new("game-over-menu")
         .anchor(egui::Align2::CENTER_CENTER, egui::Vec2::ZERO)
         .show(contexts.ctx_mut(), |ui| {
             ui.with_layout(egui::Layout::top_down(egui::Align::Center), |ui| {
                 ui.label(
                     egui::RichText::new("Game Over")
-                        .size(20.)
+                        .size(DEFAULT_FONT_SIZE)
                         .text_style(egui::TextStyle::Heading)
                         .underline()
                         .color(egui::Color32::BLACK),
@@ -170,8 +293,23 @@ fn render_game_over_system(
         });
 }
 
+fn render_victory_system(ui_state: Res<VictoryUIState>, mut contexts: EguiContexts) {
+    egui::Area::new("victory-menu")
+        .anchor(egui::Align2::CENTER_CENTER, egui::Vec2::ZERO)
+        .show(contexts.ctx_mut(), |ui| {
+            ui.with_layout(egui::Layout::top_down(egui::Align::Center), |ui| {
+                ui.label(
+                    egui::RichText::new("Victory!")
+                        .size(DEFAULT_FONT_SIZE)
+                        .text_style(egui::TextStyle::Heading)
+                        .underline()
+                        .color(egui::Color32::LIGHT_BLUE),
+                );
+            });
+        });
+}
 // Helper Functions
-fn render_player(
+fn render_character(
     contexts: &mut EguiContexts,
     character_state: CharacterUIState,
     character_type: CharacterType,
@@ -180,13 +318,13 @@ fn render_player(
     let (window_name, heading, anchor, offset) = match character_type {
         CharacterType::Player => (
             "player-window",
-            "Player:",
+            format!("{}:", character_type.to_string()),
             egui::Align2::LEFT_BOTTOM,
             egui::Vec2::new(CHARACTER_WINDOW_OFFSET, -CHARACTER_WINDOW_OFFSET),
         ),
-        CharacterType::Enemy => (
+        CharacterType::Enemy(name) => (
             "enemy-window",
-            "Enemy:",
+            format!("{}:", name),
             egui::Align2::RIGHT_TOP,
             egui::Vec2::new(-CHARACTER_WINDOW_OFFSET, CHARACTER_WINDOW_OFFSET),
         ),
@@ -199,25 +337,34 @@ fn render_player(
         .default_size(size)
         .fixed_size(size)
         .show(contexts.ctx_mut(), |ui| {
-            ui.label(heading);
-            ui.label(format!(
+            ui.label(get_default_text(heading));
+            ui.label(get_default_text(format!(
                 "Energy: {}/{}",
                 character_state.energy_remaining, character_state.total_energy
-            ));
-            ui.label(format!("Health: {}", character_state.health));
-            ui.label(format!("Block: {}", character_state.block));
+            )));
+            ui.label(get_default_text(format!(
+                "Health: {}",
+                character_state.health
+            )));
+            ui.label(get_default_text(format!(
+                "Block: {}",
+                character_state.block
+            )));
             for (effect, amount) in &character_state.status_effects {
-                ui.label(format!("Effect: {:?} x{:?}", effect, amount));
+                ui.label(get_default_text(format!(
+                    "Effect: {:?} x{:?}",
+                    effect, amount
+                )));
             }
 
             // Display the genome state.
-            ui.label("Genome:");
+            ui.label(get_default_text("Genome:".to_string()));
             ui.horizontal(|ui| {
                 for gene_state in &character_state.genome.genes {
                     let gene_text = if gene_state.is_active {
-                        RichText::new(gene_state.gene.to_string()).color(egui::Color32::GREEN)
+                        get_default_text(gene_state.gene.to_string()).color(egui::Color32::GREEN)
                     } else {
-                        RichText::new(gene_state.gene.to_string())
+                        get_default_text(gene_state.gene.to_string())
                     };
                     let gene_label = ui.label(gene_text);
                     if gene_label.hovered() {
@@ -226,5 +373,42 @@ fn render_player(
                 }
             });
         });
+}
+
+fn render_options(
+    contexts: &mut EguiContexts,
+    heading: &str,
+    options: Vec<String>,
+    mut on_click: impl FnMut(usize) -> (),
+    highlighted_options: Vec<usize>,
+) {
+    egui::CentralPanel::default().show(contexts.ctx_mut(), |ui| {
+        ui.heading(heading);
+        ui.separator();
+
+        let n_columns = options.len();
+        let button_size = egui::Vec2::new(OPTION_CARD_SIZE.0, OPTION_CARD_SIZE.1);
+        ui.columns(n_columns, |columns| {
+            for i in 0..n_columns {
+                let text = if highlighted_options.contains(&i) {
+                    egui::RichText::new(options[i].clone())
+                        .color(egui::Color32::GREEN)
+                        .size(DEFAULT_FONT_SIZE)
+                } else {
+                    egui::RichText::new(options[i].clone()).size(DEFAULT_FONT_SIZE)
+                };
+                if columns[i]
+                    .add(egui::Button::new(text).min_size(button_size.into()))
+                    .clicked()
+                {
+                    on_click(i);
+                }
+            }
+        });
+    });
+}
+
+fn get_default_text(s: String) -> egui::RichText {
+    egui::RichText::new(s).size(DEFAULT_FONT_SIZE)
 }
 // End Helper Functions

@@ -30,6 +30,10 @@ pub enum NucleotideState {
     EndOfTurn,
     GeneAnimating,
     SelectBattleReward,
+    SelectGeneFromEnemy,
+    MoveGene,
+    SwapGenes,
+    ResearchGene,
     GameOver,
     Victory,
 }
@@ -76,6 +80,21 @@ impl Player {
     pub fn get_genome(&self) -> Vec<GeneName> {
         self.genome.clone()
     }
+
+    pub fn add_gene(&mut self, gene: GeneName) {
+        self.genome.push(gene);
+    }
+
+    pub fn swap_genes(&mut self, i: usize, j: usize) {
+        assert!(i < self.genome.len() && j < self.genome.len());
+        self.genome.swap(i, j);
+    }
+
+    pub fn move_gene(&mut self, i: usize, j: usize) {
+        assert!(i < self.genome.len() && j <= self.genome.len());
+        let gene_i = self.genome.remove(i);
+        self.genome.insert(j, gene_i);
+    }
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash, Resource)]
@@ -106,10 +125,10 @@ pub struct GeneSpecs(pub GeneSpecLookup);
 pub struct CharacterTypeToEntity(pub Vec<(CharacterType, Entity)>);
 
 impl CharacterTypeToEntity {
-    pub fn get(&self, character_type: CharacterType) -> Entity {
+    pub fn get(&self, character_type: &CharacterType) -> Entity {
         self.0
             .iter()
-            .find(|(ct, _)| *ct == character_type)
+            .find(|(ct, _)| ct == character_type)
             .map(|(_, e)| *e)
             .expect("All character types should be registered when get() is called")
     }
@@ -118,7 +137,7 @@ impl CharacterTypeToEntity {
         self.0
             .iter()
             .find(|(_, e)| *e == entity)
-            .map(|(ct, _)| *ct)
+            .map(|(ct, _)| ct.clone())
             .expect("All entities should be registered when get_character_type() is called")
     }
 
@@ -137,23 +156,36 @@ impl CharacterTypeToEntity {
     }
 
     pub fn is_enemy(&self, entity: Entity) -> bool {
-        self.get_character_type(entity) == CharacterType::Enemy
+        !self.is_player(entity)
+    }
+
+    pub fn get_single_enemy(&self) -> CharacterType {
+        let to_return: Vec<CharacterType> = self
+            .0
+            .iter()
+            .filter(|(ct, _)| match ct {
+                CharacterType::Enemy(name) => true,
+                _ => false,
+            })
+            .map(|(ct, _)| ct.clone())
+            .collect();
+        assert_eq!(to_return.len(), 1);
+        return to_return.first().unwrap().clone();
     }
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub enum CharacterType {
     Player,
-    Enemy,
+    Enemy(String),
 }
 
 impl CharacterType {
     pub fn to_string(&self) -> String {
         match self {
-            Self::Player => "Player",
-            Self::Enemy => "Enemy",
+            Self::Player => "Player".to_string(),
+            Self::Enemy(name) => name.clone(),
         }
-        .to_string()
     }
 }
 

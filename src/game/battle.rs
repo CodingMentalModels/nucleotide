@@ -25,8 +25,7 @@ impl Plugin for BattlePlugin {
                 .or_else(in_state(NucleotideState::EndOfTurn))
         };
 
-        app.insert_resource(GeneCommandQueue::default())
-            .add_event::<DamageEvent>()
+        app.add_event::<DamageEvent>()
             .add_event::<BlockEvent>()
             .add_event::<GeneProcessingEvent>()
             .add_event::<StatusEffectEvent>()
@@ -48,6 +47,7 @@ impl Plugin for BattlePlugin {
                     .in_schedule(OnEnter(NucleotideState::GeneAnimating)),
                 render_genome_system.in_schedule(OnEnter(NucleotideState::GeneAnimating)),
                 finished_animating_gene_system.run_if(in_state(NucleotideState::GeneAnimating)),
+                clean_up_after_battle.in_schedule(OnEnter(NucleotideState::SelectBattleReward)),
             ));
     }
 }
@@ -92,21 +92,26 @@ fn initialize_battle_system(
     current_state: Res<State<NucleotideState>>,
     mut next_state: ResMut<NextState<NucleotideState>>,
 ) {
-    let enemy = enemy_queue
-        .pop()
-        .expect("There should always be more enemies!");
+    let enemy = match enemy_queue.pop() {
+        Some(enemy) => enemy,
+        None => {
+            commands.insert_resource(NextState(Some(NucleotideState::Victory)));
+            return;
+        }
+    };
 
     let player_entity = instantiate_player(&mut commands, player);
-    let enemy_entity = instantiate_enemy(&mut commands, enemy, gene_specs, enemy_specs);
+    let enemy_entity = instantiate_enemy(&mut commands, enemy.clone(), gene_specs, enemy_specs);
 
     commands.insert_resource(CharacterActing(player_entity));
     let character_type_to_entity: Vec<_> = vec![
         (CharacterType::Player, player_entity),
-        (CharacterType::Enemy, enemy_entity),
+        (CharacterType::Enemy(enemy), enemy_entity),
     ]
     .into_iter()
     .collect();
 
+    commands.insert_resource(GeneCommandQueue::default());
     commands.insert_resource(CharacterTypeToEntity(character_type_to_entity));
 
     queue_next_state_if_not_already_queued(
@@ -275,7 +280,9 @@ fn handle_damage_system(
                         &mut next_state,
                         NucleotideState::GameOver,
                     ),
-                    CharacterType::Enemy => queue_next_state_if_not_already_queued(
+                    CharacterType::Enemy(_) => queue_next_state_if_not_already_queued(
+                        // TODO: This doesn't handle multiple enemies at all -- if one dies, battle
+                        // over
                         current_state.0,
                         &mut next_state,
                         NucleotideState::SelectBattleReward,
@@ -365,6 +372,7 @@ fn render_character_display_system(
     for (entity, health, block, energy, status_effects, genome) in character_display_query.iter() {
         if character_type_to_entity_map.is_player(entity) {
             ui_state.player_character_state = CharacterUIState::new(
+                "Player".to_string(),
                 energy.energy_remaining,
                 energy.starting_energy,
                 health.0,
@@ -374,6 +382,7 @@ fn render_character_display_system(
             )
         } else if character_type_to_entity_map.is_enemy(entity) {
             ui_state.enemy_character_state = CharacterUIState::new(
+                "Enemy".to_string(),
                 energy.energy_remaining,
                 energy.starting_energy,
                 health.0,
@@ -408,6 +417,16 @@ fn finished_animating_gene_system(
     );
 }
 
+fn clean_up_after_battle(
+    mut commands: Commands,
+    character_type_to_entity: Res<CharacterTypeToEntity>,
+) {
+    for entity in character_type_to_entity.get_all() {
+        commands.entity(entity).despawn_recursive();
+    }
+    commands.remove_resource::<CharacterActing>();
+    commands.remove_resource::<GeneCommandQueue>();
+}
 // End Systems
 
 // Components
@@ -442,6 +461,10 @@ impl GenomeComponent {
 
     pub fn instantiate(genes: Vec<String>) -> Self {
         Self::new(genes, 0, GeneProcessingOrder::Forward, 0)
+    }
+
+    pub fn add_gene(&mut self, gene: String) {
+        self.genes.push(gene);
     }
 
     pub fn get_gene_ui_states(&self, gene_spec_lookup: &GeneSpecLookup) -> Vec<GeneUIState> {

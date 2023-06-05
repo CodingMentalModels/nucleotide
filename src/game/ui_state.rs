@@ -47,22 +47,23 @@ impl InBattleUIState {
             CharacterType::Player => self
                 .player_character_state
                 .update_genome(genome, gene_spec_lookup),
-            CharacterType::Enemy => self
+            CharacterType::Enemy(name) => self
                 .enemy_character_state
                 .update_genome(genome, gene_spec_lookup),
         }
     }
 
-    pub fn get_character_state(&self, character_type: CharacterType) -> CharacterUIState {
+    pub fn get_character_state(&self, character_type: &CharacterType) -> CharacterUIState {
         match character_type {
             CharacterType::Player => self.player_character_state.clone(),
-            CharacterType::Enemy => self.enemy_character_state.clone(),
+            CharacterType::Enemy(_) => self.enemy_character_state.clone(),
         }
     }
 }
 
 #[derive(Debug, Clone, Default, PartialEq, Eq, Hash)]
 pub struct CharacterUIState {
+    pub name: String,
     pub energy_remaining: u8,
     pub total_energy: u8,
     pub health: u8,
@@ -73,6 +74,7 @@ pub struct CharacterUIState {
 
 impl CharacterUIState {
     pub fn new(
+        name: String,
         energy_remaining: u8,
         total_energy: u8,
         health: u8,
@@ -81,6 +83,7 @@ impl CharacterUIState {
         genome: GenomeUIState,
     ) -> Self {
         Self {
+            name,
             energy_remaining,
             total_energy,
             health,
@@ -140,6 +143,23 @@ pub struct PausedUIState;
 
 #[derive(Debug, Default, Clone, PartialEq, Eq, Hash, Resource)]
 pub struct SelectBattleRewardUIState;
+
+#[derive(Debug, Default, Clone, PartialEq, Eq, Hash, Resource)]
+pub struct SelectGeneFromEnemyUIState;
+
+#[derive(Debug, Default, Clone, PartialEq, Eq, Hash, Resource)]
+pub enum MoveGeneUIState {
+    #[default]
+    FirstSelection,
+    SecondSelection(usize),
+}
+
+#[derive(Debug, Default, Clone, PartialEq, Eq, Hash, Resource)]
+pub enum SwapGenesUIState {
+    #[default]
+    FirstSelection,
+    SecondSelection(usize),
+}
 
 #[derive(Debug, Default, Clone, PartialEq, Eq, Hash, Resource)]
 pub struct GameOverUIState;

@@ -173,8 +173,8 @@ After each fight, we have the option of:
 
 ### V1
 [x] Basic versions of systems implemented for Battle and Components
-[ ] Basic drafting system implemented
-[ ] Game Over Screen
+[x] Basic drafting system implemented
+[x] Game Over Screen
 [ ] Models loaded and displaying on screen
 [ ] 10 basic genes and 3 basic enemies
     [ ] Status effects need to wear out at the appropriate time (e.g. block at the beginning of turn)

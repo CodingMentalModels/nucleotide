@@ -1,4 +1,4 @@
-use serde::{Serialize, Deserialize};
+use serde::{Deserialize, Serialize};
 
 pub type GeneName = String;
 pub type EnemyName = String;
@@ -12,8 +12,12 @@ pub struct GeneSpec {
 }
 
 impl GeneSpec {
-
-    pub fn new(name: GeneName, text: String, target: TargetType, gene_commands: Vec<GeneCommand>) -> Self {
+    pub fn new(
+        name: GeneName,
+        text: String,
+        target: TargetType,
+        gene_commands: Vec<GeneCommand>,
+    ) -> Self {
         Self {
             name,
             text,
@@ -48,7 +52,6 @@ pub struct EnemySpec {
 }
 
 impl EnemySpec {
-
     pub fn new(name: String, health: u8, energy: u8, genome: Vec<GeneName>) -> Self {
         Self {
             name,
@@ -94,26 +97,24 @@ pub enum GeneCommand {
     GainEnergy(u8),
 }
 
-
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
 pub enum StatusEffect {
     Poison,
     Weak,
+    Constricted,
     RepeatGene,
 }
 
 impl StatusEffect {
-
     pub fn get_activation_timing(&self) -> ActivationTiming {
         match self {
             StatusEffect::Poison => ActivationTiming::EndOfTurn,
-            StatusEffect::Weak => ActivationTiming::NotApplicable,
-            StatusEffect::RepeatGene => ActivationTiming::StartOfTurn,
+            StatusEffect::Weak => ActivationTiming::EndOfTurn,
+            StatusEffect::Constricted => ActivationTiming::NotApplicable,
+            StatusEffect::RepeatGene => ActivationTiming::EndOfTurn,
         }
     }
-
 }
-
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
 pub enum ActivationTiming {
@@ -121,3 +122,4 @@ pub enum ActivationTiming {
     EndOfTurn,
     NotApplicable,
 }
+

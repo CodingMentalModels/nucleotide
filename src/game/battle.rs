@@ -175,12 +175,12 @@ fn gene_loading_system(
     character_type_to_entity_map: Res<CharacterTypeToEntity>,
     mut gene_command_queue: ResMut<GeneCommandQueue>,
     gene_specs: Res<GeneSpecs>,
-    mut query: Query<(Entity, &mut GenomeComponent)>,
+    mut query: Query<(Entity, &mut GenomeComponent, &StatusEffectComponent)>,
     mut pause_unpause_event_writer: EventWriter<PauseUnpauseEvent>,
     current_state: Res<State<NucleotideState>>,
     mut next_state: ResMut<NextState<NucleotideState>>,
 ) {
-    let (acting_entity, genome) = query.get_mut(character_acting.0).unwrap();
+    let (acting_entity, genome, status_effects) = query.get_mut(character_acting.0).unwrap();
 
     let gene = genome.get_active_gene();
 
@@ -198,6 +198,10 @@ fn gene_loading_system(
         &mut gene_spec
             .get_gene_commands()
             .iter()
+            .filter(|gene_command| match gene_command {
+                GeneCommand::Damage(_) => !status_effects.contains(&StatusEffect::Constricted),
+                _ => true,
+            })
             .map(|gene_command| {
                 targets
                     .iter()
@@ -324,10 +328,10 @@ fn apply_status_effect_system(
     mut status_effect_event_reader: EventReader<StatusEffectEvent>,
 ) {
     for status_effect_event in status_effect_event_reader.iter() {
-        if let Ok((_, mut status_effect)) = query.get_mut(status_effect_event.0) {
-            status_effect
-                .0
-                .push((status_effect_event.1, status_effect_event.2));
+        if let Ok((entity, mut status_effect)) = query.get_mut(status_effect_event.0) {
+            if entity == status_effect_event.0 {
+                status_effect.add(status_effect_event.1, status_effect_event.2);
+            }
         }
     }
 }
@@ -506,6 +510,7 @@ impl GenomeComponent {
 
     pub fn advance_pointer(&mut self) {
         if self.repeat_gene > 0 {
+            panic!("Broken, repeat gets stuck in a loop and we never do anything again.");
             self.repeat_gene -= 1;
             return;
         }
@@ -556,6 +561,31 @@ pub struct BlockComponent(pub u8);
 
 #[derive(Component, Clone)]
 pub struct StatusEffectComponent(pub Vec<(StatusEffect, u8)>);
+
+impl StatusEffectComponent {
+    pub fn contains(&self, status_effect: &StatusEffect) -> bool {
+        self.0.iter().filter(|(e, _)| e == status_effect).count() > 0
+    }
+
+    pub fn add(&mut self, status_effect: StatusEffect, n_stacks: u8) {
+        if self.contains(&status_effect) {
+            self.0 = self
+                .0
+                .clone()
+                .into_iter()
+                .map(|(e, n)| {
+                    if e == status_effect {
+                        (e, n + n_stacks)
+                    } else {
+                        (e, n)
+                    }
+                })
+                .collect();
+        } else {
+            self.0.push((status_effect, n_stacks));
+        }
+    }
+}
 
 // End Components
 
@@ -652,6 +682,9 @@ fn handle_statuses(
                     }
                     StatusEffect::RepeatGene => {
                         genome.increment_repeat_gene();
+                        *n_stacks -= 1;
+                    }
+                    StatusEffect::Weak | StatusEffect::Constricted => {
                         *n_stacks -= 1;
                     }
                     _ => panic!("Unimplemented Status Effect! {:?}", status_effect_type),

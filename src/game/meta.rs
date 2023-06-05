@@ -2,10 +2,7 @@ use bevy::prelude::*;
 
 use crate::game::resources::*;
 
-use super::{
-    constants::{STARTING_PLAYER_ENERGY, STARTING_PLAYER_HEALTH},
-    ui_state::InitializingBattleUIState,
-};
+use super::constants::{STARTING_PLAYER_ENERGY, STARTING_PLAYER_HEALTH};
 
 pub struct MetaPlugin;
 

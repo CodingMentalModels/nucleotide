@@ -205,6 +205,7 @@ After each fight, we have the option of:
 [ ] Constrict
 [ ] Shock
 [ ] Gore
+[ ] Roll -- Damage that ignores block
 
 #### Defense
 [x] Block

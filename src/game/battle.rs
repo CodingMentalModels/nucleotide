@@ -175,12 +175,12 @@ fn gene_loading_system(
     character_type_to_entity_map: Res<CharacterTypeToEntity>,
     mut gene_command_queue: ResMut<GeneCommandQueue>,
     gene_specs: Res<GeneSpecs>,
-    mut query: Query<(Entity, &mut GenomeComponent)>,
+    mut query: Query<(Entity, &mut GenomeComponent, &StatusEffectComponent)>,
     mut pause_unpause_event_writer: EventWriter<PauseUnpauseEvent>,
     current_state: Res<State<NucleotideState>>,
     mut next_state: ResMut<NextState<NucleotideState>>,
 ) {
-    let (acting_entity, genome) = query.get_mut(character_acting.0).unwrap();
+    let (acting_entity, genome, status_effects) = query.get_mut(character_acting.0).unwrap();
 
     let gene = genome.get_active_gene();
 
@@ -198,6 +198,10 @@ fn gene_loading_system(
         &mut gene_spec
             .get_gene_commands()
             .iter()
+            .filter(|gene_command| match gene_command {
+                GeneCommand::Damage(_) => !status_effects.contains(&StatusEffect::Constricted),
+                _ => true,
+            })
             .map(|gene_command| {
                 targets
                     .iter()
@@ -275,12 +279,12 @@ fn handle_damage_system(
 
             if health.0 == 0 {
                 match character_type_to_entity.get_character_type(entity) {
-                    CharacterType::Player => queue_next_state_if_not_already_queued(
+                    CharacterType::Player => force_next_state(
                         current_state.0,
                         &mut next_state,
                         NucleotideState::GameOver,
                     ),
-                    CharacterType::Enemy(_) => queue_next_state_if_not_already_queued(
+                    CharacterType::Enemy(_) => force_next_state(
                         // TODO: This doesn't handle multiple enemies at all -- if one dies, battle
                         // over
                         current_state.0,
@@ -324,10 +328,10 @@ fn apply_status_effect_system(
     mut status_effect_event_reader: EventReader<StatusEffectEvent>,
 ) {
     for status_effect_event in status_effect_event_reader.iter() {
-        if let Ok((_, mut status_effect)) = query.get_mut(status_effect_event.0) {
-            status_effect
-                .0
-                .push((status_effect_event.1, status_effect_event.2));
+        if let Ok((entity, mut status_effect)) = query.get_mut(status_effect_event.0) {
+            if entity == status_effect_event.0 {
+                status_effect.add(status_effect_event.1, status_effect_event.2);
+            }
         }
     }
 }
@@ -557,6 +561,31 @@ pub struct BlockComponent(pub u8);
 #[derive(Component, Clone)]
 pub struct StatusEffectComponent(pub Vec<(StatusEffect, u8)>);
 
+impl StatusEffectComponent {
+    pub fn contains(&self, status_effect: &StatusEffect) -> bool {
+        self.0.iter().filter(|(e, _)| e == status_effect).count() > 0
+    }
+
+    pub fn add(&mut self, status_effect: StatusEffect, n_stacks: u8) {
+        if self.contains(&status_effect) {
+            self.0 = self
+                .0
+                .clone()
+                .into_iter()
+                .map(|(e, n)| {
+                    if e == status_effect {
+                        (e, n + n_stacks)
+                    } else {
+                        (e, n)
+                    }
+                })
+                .collect();
+        } else {
+            self.0.push((status_effect, n_stacks));
+        }
+    }
+}
+
 // End Components
 
 // Helper Types
@@ -654,6 +683,9 @@ fn handle_statuses(
                         genome.increment_repeat_gene();
                         *n_stacks -= 1;
                     }
+                    StatusEffect::Weak | StatusEffect::Constricted => {
+                        *n_stacks -= 1;
+                    }
                     _ => panic!("Unimplemented Status Effect! {:?}", status_effect_type),
                 };
                 *n_stacks > 0
@@ -680,6 +712,18 @@ fn queue_next_state_if_not_already_queued(
             current_state
         );
     }
+}
+
+fn force_next_state(
+    current_state: NucleotideState,
+    next_state: &mut ResMut<NextState<NucleotideState>>,
+    next_state_to_queue: NucleotideState,
+) {
+    println!(
+        "Forcing state to {:?} (Current state: {:?}, Next state was: {:?})",
+        next_state_to_queue, current_state, next_state.0
+    );
+    next_state.0 = Some(next_state_to_queue);
 }
 
 // End Helper Functions

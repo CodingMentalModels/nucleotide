@@ -57,6 +57,19 @@ impl Plugin for BattlePlugin {
 // End Run Conditions
 
 // Resources
+#[derive(Resource, Clone, Default)]
+pub struct LogState(Vec<egui::RichText>);
+
+impl LogState {
+    pub fn get_messages(&self) -> Vec<egui::RichText> {
+        self.0.clone()
+    }
+
+    pub fn log(&mut self, message: String) {
+        self.0
+            .push(egui::RichText::new(message).size(LOG_TEXT_SIZE));
+    }
+}
 
 // End Resources
 
@@ -99,6 +112,8 @@ fn initialize_battle_system(
             return;
         }
     };
+
+    commands.insert_resource(LogState::default());
 
     let player_entity = instantiate_player(&mut commands, player);
     let enemy_entity = instantiate_enemy(&mut commands, enemy.clone(), gene_specs, enemy_specs);
@@ -226,14 +241,18 @@ fn handle_gene_commands_system(
     mut pause_unpause_event_writer: EventWriter<PauseUnpauseEvent>,
     mut gene_processing_event_writer: EventWriter<GeneProcessingEvent>,
     mut status_effect_event_writer: EventWriter<StatusEffectEvent>,
+    mut log_state: ResMut<LogState>,
     current_state: Res<State<NucleotideState>>,
     mut next_state: ResMut<NextState<NucleotideState>>,
 ) {
     for (gene_command, target_entity) in gene_command_queue.0.iter() {
         match gene_command {
-            GeneCommand::Damage(damage) => {
-                damage_event_writer.send(DamageEvent(*target_entity, *damage));
-            }
+            GeneCommand::Damage(damage) => log_and_send(
+                &mut log_state,
+                format!("{} damage dealt.", damage),
+                &mut damage_event_writer,
+                DamageEvent(*target_entity, *damage),
+            ),
             GeneCommand::Block(amount) => {
                 block_event_writer.send(BlockEvent(*target_entity, *amount));
             }
@@ -434,6 +453,7 @@ fn clean_up_after_battle(
 // End Systems
 
 // Components
+
 #[derive(Component, Clone, Copy)]
 pub struct PlayerComponent;
 
@@ -724,6 +744,16 @@ fn force_next_state(
         next_state_to_queue, current_state, next_state.0
     );
     next_state.0 = Some(next_state_to_queue);
+}
+
+fn log_and_send<E: Send + Sync + Event>(
+    log_state: &mut LogState,
+    message: String,
+    writer: &mut EventWriter<E>,
+    event: E,
+) {
+    log_state.log(message);
+    writer.send(event);
 }
 
 // End Helper Functions

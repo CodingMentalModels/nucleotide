@@ -13,6 +13,8 @@ pub const ENEMY_WINDOW_SIZE: (f32, f32) = (150.0, 100.0);
 pub const CHARACTER_WINDOW_OFFSET: f32 = 20.;
 pub const OPTION_CARD_SIZE: (f32, f32) = (100., 200.);
 pub const DEFAULT_FONT_SIZE: f32 = 28.;
+pub const LOG_WINDOW_SIZE: (f32, f32) = (1000.0, 300.0);
+pub const LOG_TEXT_SIZE: f32 = 20.;
 
 // Greek Letters
 pub const ALPHA_LOWER: char = 'α';

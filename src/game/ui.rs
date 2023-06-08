@@ -6,7 +6,7 @@ use egui::{RichText, Ui};
 use crate::game::constants::*;
 use crate::game::resources::*;
 
-use super::battle::GenomeComponent;
+use super::battle::{GenomeComponent, LogState};
 use super::ui_state::{
     CharacterUIState, GameOverUIState, GenomeUIState, InBattleUIState, MoveGeneUIState,
     PausedUIState, SelectBattleRewardUIState, SwapGenesUIState, VictoryUIState,
@@ -88,6 +88,7 @@ fn ui_load_system(mut commands: Commands, asset_server: Res<AssetServer>) {
 fn render_battle_system(
     ui_state: Res<InBattleUIState>,
     mut contexts: EguiContexts,
+    log_state: Res<LogState>,
     character_type_to_entity: Res<CharacterTypeToEntity>,
 ) {
     let player_size = egui::Vec2::new(PLAYER_WINDOW_SIZE.0, PLAYER_WINDOW_SIZE.1);
@@ -98,13 +99,35 @@ fn render_battle_system(
     let player_state = ui_state.get_character_state(&CharacterType::Player);
     let enemy_state = ui_state.get_character_state(&enemy_character_type);
 
-    render_character(
-        &mut contexts,
-        player_state,
-        CharacterType::Player,
-        player_size,
-    );
-    render_character(&mut contexts, enemy_state, enemy_character_type, enemy_size);
+    let ctx = contexts.ctx_mut();
+
+    egui::TopBottomPanel::bottom("log-panel").show(ctx, |mut ui| {
+        render_log(&mut ui, &log_state);
+    });
+
+    egui::TopBottomPanel::top("battle-panel").show(contexts.ctx_mut(), |ui| {
+        ui.vertical(|ui| {
+            ui.with_layout(egui::Layout::top_down(egui::Align::RIGHT), |ui| {
+                // Render the enemy
+                render_character(
+                    ui,
+                    enemy_state,
+                    CharacterType::Enemy("EnemyName".to_string()),
+                );
+            });
+
+            ui.with_layout(
+                egui::Layout::from_main_dir_and_cross_align(
+                    egui::Direction::TopDown,
+                    egui::Align::LEFT,
+                ),
+                |ui| {
+                    // Render the player
+                    render_character(ui, player_state, CharacterType::Player);
+                },
+            );
+        });
+    });
 }
 
 fn render_select_reward_system(
@@ -309,69 +332,59 @@ fn render_victory_system(ui_state: Res<VictoryUIState>, mut contexts: EguiContex
         });
 }
 // Helper Functions
-fn render_character(
-    contexts: &mut EguiContexts,
-    character_state: CharacterUIState,
-    character_type: CharacterType,
-    size: egui::Vec2,
-) {
-    let (window_name, heading, anchor, offset) = match character_type {
-        CharacterType::Player => (
-            "player-window",
-            format!("{}:", character_type.to_string()),
-            egui::Align2::LEFT_BOTTOM,
-            egui::Vec2::new(CHARACTER_WINDOW_OFFSET, -CHARACTER_WINDOW_OFFSET),
-        ),
-        CharacterType::Enemy(name) => (
-            "enemy-window",
-            format!("{}:", name),
-            egui::Align2::RIGHT_TOP,
-            egui::Vec2::new(-CHARACTER_WINDOW_OFFSET, CHARACTER_WINDOW_OFFSET),
-        ),
+fn render_character(ui: &mut Ui, character_state: CharacterUIState, character_type: CharacterType) {
+    let heading = match character_type {
+        CharacterType::Player => format!("{}:", character_type.to_string()),
+        CharacterType::Enemy(name) => format!("{}:", name),
     };
 
-    egui::containers::Window::new(window_name)
-        .movable(false)
-        .title_bar(false)
-        .anchor(anchor, offset)
-        .default_size(size)
-        .fixed_size(size)
-        .show(contexts.ctx_mut(), |ui| {
-            ui.label(get_default_text(heading));
-            ui.label(get_default_text(format!(
-                "Energy: {}/{}",
-                character_state.energy_remaining, character_state.total_energy
-            )));
-            ui.label(get_default_text(format!(
-                "Health: {}",
-                character_state.health
-            )));
-            ui.label(get_default_text(format!(
-                "Block: {}",
-                character_state.block
-            )));
-            for (effect, amount) in &character_state.status_effects {
-                ui.label(get_default_text(format!(
-                    "Effect: {:?} x{:?}",
-                    effect, amount
-                )));
-            }
+    ui.label(get_default_text(heading));
+    ui.label(get_default_text(format!(
+        "Energy: {}/{}",
+        character_state.energy_remaining, character_state.total_energy
+    )));
+    ui.label(get_default_text(format!(
+        "Health: {}",
+        character_state.health
+    )));
+    ui.label(get_default_text(format!(
+        "Block: {}",
+        character_state.block
+    )));
+    for (effect, amount) in &character_state.status_effects {
+        ui.label(get_default_text(format!(
+            "Effect: {:?} x{:?}",
+            effect, amount
+        )));
+    }
 
-            // Display the genome state.
-            ui.label(get_default_text("Genome:".to_string()));
-            ui.horizontal(|ui| {
-                for gene_state in &character_state.genome.genes {
-                    let gene_text = if gene_state.is_active {
-                        get_default_text(gene_state.gene.to_string()).color(egui::Color32::GREEN)
-                    } else {
-                        get_default_text(gene_state.gene.to_string())
-                    };
-                    let gene_label = ui.label(gene_text);
-                    if gene_label.hovered() {
-                        gene_label.on_hover_text(get_default_text(gene_state.hovertext.clone()));
-                    }
-                }
-            });
+    // Display the genome state.
+    ui.label(get_default_text("Genome:".to_string()));
+    ui.horizontal(|ui| {
+        for gene_state in &character_state.genome.genes {
+            let gene_text = if gene_state.is_active {
+                get_default_text(gene_state.gene.to_string()).color(egui::Color32::GREEN)
+            } else {
+                get_default_text(gene_state.gene.to_string())
+            };
+            let gene_label = ui.label(gene_text);
+            if gene_label.hovered() {
+                gene_label.on_hover_text(get_default_text(gene_state.hovertext.clone()));
+            }
+        }
+    });
+}
+
+fn render_log(ui: &mut Ui, log_state: &LogState) {
+    let log_window_size = egui::Vec2::new(LOG_WINDOW_SIZE.0, LOG_WINDOW_SIZE.1);
+
+    egui::ScrollArea::vertical()
+        .auto_shrink([false, false])
+        .stick_to_bottom(true)
+        .show(ui, |ui| {
+            for log_message in log_state.get_messages().into_iter() {
+                ui.label(log_message);
+            }
         });
 }
 

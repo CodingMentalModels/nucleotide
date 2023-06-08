@@ -279,12 +279,12 @@ fn handle_damage_system(
 
             if health.0 == 0 {
                 match character_type_to_entity.get_character_type(entity) {
-                    CharacterType::Player => queue_next_state_if_not_already_queued(
+                    CharacterType::Player => force_next_state(
                         current_state.0,
                         &mut next_state,
                         NucleotideState::GameOver,
                     ),
-                    CharacterType::Enemy(_) => queue_next_state_if_not_already_queued(
+                    CharacterType::Enemy(_) => force_next_state(
                         // TODO: This doesn't handle multiple enemies at all -- if one dies, battle
                         // over
                         current_state.0,
@@ -509,7 +509,6 @@ impl GenomeComponent {
     }
 
     pub fn advance_pointer(&mut self) {
-        println!("Pointer: {}, Repeat Gene: {}", self.pointer, self.repeat_gene);
         if self.repeat_gene > 0 {
             self.repeat_gene -= 1;
             return;
@@ -713,6 +712,18 @@ fn queue_next_state_if_not_already_queued(
             current_state
         );
     }
+}
+
+fn force_next_state(
+    current_state: NucleotideState,
+    next_state: &mut ResMut<NextState<NucleotideState>>,
+    next_state_to_queue: NucleotideState,
+) {
+    println!(
+        "Forcing state to {:?} (Current state: {:?}, Next state was: {:?})",
+        next_state_to_queue, current_state, next_state.0
+    );
+    next_state.0 = Some(next_state_to_queue);
 }
 
 // End Helper Functions

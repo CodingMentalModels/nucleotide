@@ -111,7 +111,7 @@ impl StatusEffect {
             StatusEffect::Poison => ActivationTiming::EndOfTurn,
             StatusEffect::Weak => ActivationTiming::EndOfTurn,
             StatusEffect::Constricted => ActivationTiming::NotApplicable,
-            StatusEffect::RepeatGene => ActivationTiming::EndOfTurn,
+            StatusEffect::RepeatGene => ActivationTiming::StartOfTurn,
         }
     }
 }
@@ -122,4 +122,3 @@ pub enum ActivationTiming {
     EndOfTurn,
     NotApplicable,
 }
-

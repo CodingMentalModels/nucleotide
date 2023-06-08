@@ -22,8 +22,8 @@ impl Plugin for MetaPlugin {
 
 fn instantiate_meta_system(mut commands: Commands, enemy_specs: Res<EnemySpecs>) {
     let player_genome = vec![
-        "Sting".to_string(),
         "Repeat Codon".to_string(),
+        "Sting".to_string(),
         "Block".to_string(),
         "Reverse Codon".to_string(),
         "Stomp".to_string(),

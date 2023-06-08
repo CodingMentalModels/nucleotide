@@ -509,8 +509,8 @@ impl GenomeComponent {
     }
 
     pub fn advance_pointer(&mut self) {
+        println!("Pointer: {}, Repeat Gene: {}", self.pointer, self.repeat_gene);
         if self.repeat_gene > 0 {
-            panic!("Broken, repeat gets stuck in a loop and we never do anything again.");
             self.repeat_gene -= 1;
             return;
         }

@@ -368,7 +368,7 @@ fn render_character(
                     };
                     let gene_label = ui.label(gene_text);
                     if gene_label.hovered() {
-                        gene_label.on_hover_text(gene_state.hovertext.clone());
+                        gene_label.on_hover_text(get_default_text(gene_state.hovertext.clone()));
                     }
                 }
             });

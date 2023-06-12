@@ -227,7 +227,7 @@ fn gene_loading_system(
 
     let gene = genome.get_active_gene();
 
-    log.log_string(format!("Expressing {}", gene));
+    log.log_string(format!("Expressing {}.", gene));
     let gene_spec = gene_specs
         .0
         .get_spec_from_name(&gene)
@@ -283,21 +283,25 @@ fn handle_gene_commands_system(
                 DamageEvent(*target_entity, *damage),
             ),
             GeneCommand::Block(amount) => {
-                block_event_writer.send(BlockEvent(*target_entity, *amount));
+                log_and_send(
+                    &mut log_state,
+                    format!("{} damage blocked.", amount),
+                    &mut block_event_writer,
+                    BlockEvent(*target_entity, *amount),
+                );
             }
-            GeneCommand::ReverseGeneProcessing => {
-                gene_processing_event_writer.send(GeneProcessingEvent(
-                    *target_entity,
-                    GeneProcessingEventType::Reverse,
-                ));
-            }
-            GeneCommand::Status(effect, n_stacks) => {
-                status_effect_event_writer.send(StatusEffectEvent(
-                    *target_entity,
-                    *effect,
-                    *n_stacks,
-                ));
-            }
+            GeneCommand::ReverseGeneProcessing => log_and_send(
+                &mut log_state,
+                "Gene processing reversed.".to_string(),
+                &mut gene_processing_event_writer,
+                GeneProcessingEvent(*target_entity, GeneProcessingEventType::Reverse),
+            ),
+            GeneCommand::Status(effect, n_stacks) => log_and_send(
+                &mut log_state,
+                format!("{} stacks of {} applied.", n_stacks, effect.to_string()),
+                &mut status_effect_event_writer,
+                StatusEffectEvent(*target_entity, *effect, *n_stacks),
+            ),
             _ => panic!("Unimplemented Gene Command!"),
         }
     }

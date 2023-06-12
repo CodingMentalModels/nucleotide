@@ -114,6 +114,16 @@ impl StatusEffect {
             StatusEffect::RepeatGene => ActivationTiming::StartOfTurn,
         }
     }
+
+    pub fn to_string(&self) -> String {
+        match self {
+            StatusEffect::Poison => "Poison",
+            StatusEffect::Weak => "Weak",
+            StatusEffect::Constricted => "Constricted",
+            StatusEffect::RepeatGene => "Repeat Gene",
+        }
+        .to_string()
+    }
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]

@@ -380,6 +380,7 @@ fn render_log(ui: &mut Ui, log_state: &LogState) {
 
     egui::ScrollArea::vertical()
         .auto_shrink([false, false])
+        .min_scrolled_height(LOG_WINDOW_SIZE.1)
         .stick_to_bottom(true)
         .show(ui, |ui| {
             for log_message in log_state.get_messages().into_iter() {

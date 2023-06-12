@@ -221,11 +221,13 @@ fn gene_loading_system(
     mut pause_unpause_event_writer: EventWriter<PauseUnpauseEvent>,
     current_state: Res<State<NucleotideState>>,
     mut next_state: ResMut<NextState<NucleotideState>>,
+    mut log: ResMut<LogState>,
 ) {
     let (acting_entity, genome, status_effects) = query.get_mut(character_acting.0).unwrap();
 
     let gene = genome.get_active_gene();
 
+    log.log_string(format!("Expressing {}", gene));
     let gene_spec = gene_specs
         .0
         .get_spec_from_name(&gene)

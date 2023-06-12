@@ -61,13 +61,35 @@ impl Plugin for BattlePlugin {
 pub struct LogState(Vec<egui::RichText>);
 
 impl LogState {
+    pub fn log_characters_turn(&mut self, character_type: CharacterType) {
+        let character_color = character_type.to_color();
+        self.log_string_color(
+            format!("{}'s Turn", character_type.to_string()),
+            character_color,
+        );
+    }
     pub fn get_messages(&self) -> Vec<egui::RichText> {
         self.0.clone()
     }
 
-    pub fn log(&mut self, message: String) {
-        self.0
-            .push(egui::RichText::new(message).size(LOG_TEXT_SIZE));
+    pub fn log_string(&mut self, message: String) {
+        self.0.push(
+            egui::RichText::new(message)
+                .size(LOG_TEXT_SIZE)
+                .color(egui::Color32::WHITE),
+        );
+    }
+
+    pub fn log_string_color(&mut self, message: String, color: egui::Color32) {
+        self.0.push(
+            egui::RichText::new(message)
+                .color(color)
+                .size(LOG_TEXT_SIZE),
+        );
+    }
+
+    pub fn log(&mut self, message: egui::RichText) {
+        self.0.push(message);
     }
 }
 
@@ -113,12 +135,13 @@ fn initialize_battle_system(
         }
     };
 
-    commands.insert_resource(LogState::default());
+    let mut log = LogState::default();
 
     let player_entity = instantiate_player(&mut commands, player);
     let enemy_entity = instantiate_enemy(&mut commands, enemy.clone(), gene_specs, enemy_specs);
 
     commands.insert_resource(CharacterActing(player_entity));
+    log.log_characters_turn(CharacterType::Player);
     let character_type_to_entity: Vec<_> = vec![
         (CharacterType::Player, player_entity),
         (CharacterType::Enemy(enemy), enemy_entity),
@@ -126,6 +149,7 @@ fn initialize_battle_system(
     .into_iter()
     .collect();
 
+    commands.insert_resource(log);
     commands.insert_resource(GeneCommandQueue::default());
     commands.insert_resource(CharacterTypeToEntity(character_type_to_entity));
 
@@ -144,6 +168,7 @@ fn character_acting_system(
     mut pause_unpause_event_writer: EventWriter<PauseUnpauseEvent>,
     current_state: Res<State<NucleotideState>>,
     mut next_state: ResMut<NextState<NucleotideState>>,
+    mut log: ResMut<LogState>,
 ) {
     let (acting_entity, mut energy) = query.get_mut(character_acting.0).unwrap();
 
@@ -151,6 +176,8 @@ fn character_acting_system(
         energy.energy_remaining = energy.starting_energy;
         character_acting.0 = character_type_to_entity_map.get_next(acting_entity);
 
+        let character_type = character_type_to_entity_map.get_character_type(character_acting.0);
+        log.log_characters_turn(character_type);
         remove_statuses_query
             .iter_mut()
             .filter(|(entity, _block)| entity == &character_acting.0)
@@ -752,7 +779,7 @@ fn log_and_send<E: Send + Sync + Event>(
     writer: &mut EventWriter<E>,
     event: E,
 ) {
-    log_state.log(message);
+    log_state.log_string(message);
     writer.send(event);
 }
 

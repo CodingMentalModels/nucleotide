@@ -63,9 +63,11 @@ pub struct LogState(Vec<egui::RichText>);
 impl LogState {
     pub fn log_characters_turn(&mut self, character_type: CharacterType) {
         let character_color = character_type.to_color();
-        self.log_string_color(
-            format!("{}'s Turn", character_type.to_string()),
-            character_color,
+        self.log(
+            egui::RichText::new(format!("{}'s Turn", character_type.to_string()))
+                .size(LOG_TEXT_SIZE)
+                .color(character_color)
+                .underline(),
         );
     }
     pub fn get_messages(&self) -> Vec<egui::RichText> {

@@ -102,6 +102,7 @@ fn render_battle_system(
     let ctx = contexts.ctx_mut();
 
     egui::TopBottomPanel::bottom("log-panel").show(ctx, |mut ui| {
+        ui.label(get_underlined_text("Log".to_string()));
         render_log(&mut ui, &log_state);
     });
 
@@ -422,7 +423,13 @@ fn render_options(
     });
 }
 
+fn get_underlined_text(s: String) -> egui::RichText {
+    get_default_text(s).underline()
+}
+
 fn get_default_text(s: String) -> egui::RichText {
-    egui::RichText::new(s).size(DEFAULT_FONT_SIZE)
+    egui::RichText::new(s)
+        .size(DEFAULT_FONT_SIZE)
+        .color(egui::Color32::WHITE)
 }
 // End Helper Functions

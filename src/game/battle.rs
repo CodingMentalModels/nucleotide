@@ -202,8 +202,14 @@ fn handle_start_of_turn_statuses_system(
     mut pause_unpause_event_writer: EventWriter<PauseUnpauseEvent>,
     current_state: Res<State<NucleotideState>>,
     mut next_state: ResMut<NextState<NucleotideState>>,
+    mut log_state: ResMut<LogState>,
 ) {
-    handle_statuses(query, damage_event_writer, ActivationTiming::StartOfTurn);
+    handle_statuses(
+        query,
+        damage_event_writer,
+        ActivationTiming::StartOfTurn,
+        &mut log_state,
+    );
 
     queue_next_state_if_not_already_queued(
         current_state.0,
@@ -393,8 +399,14 @@ fn apply_status_effect_system(
 fn handle_end_of_turn_statuses_system(
     query: Query<(Entity, &mut StatusEffectComponent, &mut GenomeComponent)>,
     damage_event_writer: EventWriter<DamageEvent>,
+    mut log: ResMut<LogState>,
 ) {
-    handle_statuses(query, damage_event_writer, ActivationTiming::EndOfTurn);
+    handle_statuses(
+        query,
+        damage_event_writer,
+        ActivationTiming::EndOfTurn,
+        &mut log,
+    );
 }
 
 fn finished_handling_gene_system(
@@ -721,6 +733,7 @@ fn handle_statuses(
     mut query: Query<(Entity, &mut StatusEffectComponent, &mut GenomeComponent)>,
     mut damage_event_writer: EventWriter<DamageEvent>,
     activation_timing: ActivationTiming,
+    mut log: &mut ResMut<LogState>,
 ) {
     for (entity, mut status_effect, mut genome) in query.iter_mut() {
         status_effect
@@ -731,7 +744,12 @@ fn handle_statuses(
                 }
                 match status_effect_type {
                     StatusEffect::Poison => {
-                        damage_event_writer.send(DamageEvent(entity, *n_stacks));
+                        log_and_send(
+                            &mut log,
+                            format!("Poison deals {} damage.", n_stacks),
+                            &mut damage_event_writer,
+                            DamageEvent(entity, *n_stacks),
+                        );
                         *n_stacks -= 1;
                     }
                     StatusEffect::RepeatGene => {

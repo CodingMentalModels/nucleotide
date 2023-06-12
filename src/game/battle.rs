@@ -166,7 +166,7 @@ fn character_acting_system(
     mut character_acting: ResMut<CharacterActing>,
     character_type_to_entity_map: Res<CharacterTypeToEntity>,
     mut query: Query<(Entity, &mut EnergyComponent)>,
-    mut remove_statuses_query: Query<(Entity, &mut BlockComponent)>,
+    mut remove_statuses_query: Query<(Entity, &mut BlockComponent, &mut StatusEffectComponent)>,
     mut pause_unpause_event_writer: EventWriter<PauseUnpauseEvent>,
     current_state: Res<State<NucleotideState>>,
     mut next_state: ResMut<NextState<NucleotideState>>,
@@ -182,11 +182,13 @@ fn character_acting_system(
         log.log_characters_turn(character_type);
         remove_statuses_query
             .iter_mut()
-            .filter(|(entity, _block)| entity == &character_acting.0)
-            .for_each(|(_entity, mut block)| block.0 = 0);
-    } else {
-        energy.energy_remaining -= 1;
+            .filter(|(entity, _block, _statuses)| entity == &character_acting.0)
+            .for_each(|(_entity, mut block, mut statuses)| {
+                block.0 = 0;
+                statuses.clear();
+            });
     }
+    energy.energy_remaining -= 1;
 
     queue_next_state_if_not_already_queued(
         current_state.0,
@@ -650,6 +652,10 @@ impl StatusEffectComponent {
         } else {
             self.0.push((status_effect, n_stacks));
         }
+    }
+
+    pub fn clear(&mut self) {
+        self.0 = Vec::new();
     }
 }
 

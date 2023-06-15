@@ -187,6 +187,13 @@ impl CharacterType {
             Self::Enemy(name) => name.clone(),
         }
     }
+
+    pub fn to_color(&self) -> egui::Color32 {
+        match self {
+            Self::Player => egui::Color32::GREEN,
+            Self::Enemy(_) => egui::Color32::RED,
+        }
+    }
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]

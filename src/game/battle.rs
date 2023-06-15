@@ -57,6 +57,43 @@ impl Plugin for BattlePlugin {
 // End Run Conditions
 
 // Resources
+#[derive(Resource, Clone, Default)]
+pub struct LogState(Vec<egui::RichText>);
+
+impl LogState {
+    pub fn log_characters_turn(&mut self, character_type: CharacterType) {
+        let character_color = character_type.to_color();
+        self.log(
+            egui::RichText::new(format!("{}'s Turn", character_type.to_string()))
+                .size(LOG_TEXT_SIZE)
+                .color(character_color)
+                .underline(),
+        );
+    }
+    pub fn get_messages(&self) -> Vec<egui::RichText> {
+        self.0.clone()
+    }
+
+    pub fn log_string(&mut self, message: String) {
+        self.0.push(
+            egui::RichText::new(message)
+                .size(LOG_TEXT_SIZE)
+                .color(egui::Color32::WHITE),
+        );
+    }
+
+    pub fn log_string_color(&mut self, message: String, color: egui::Color32) {
+        self.0.push(
+            egui::RichText::new(message)
+                .color(color)
+                .size(LOG_TEXT_SIZE),
+        );
+    }
+
+    pub fn log(&mut self, message: egui::RichText) {
+        self.0.push(message);
+    }
+}
 
 // End Resources
 
@@ -100,10 +137,13 @@ fn initialize_battle_system(
         }
     };
 
+    let mut log = LogState::default();
+
     let player_entity = instantiate_player(&mut commands, player);
     let enemy_entity = instantiate_enemy(&mut commands, enemy.clone(), gene_specs, enemy_specs);
 
     commands.insert_resource(CharacterActing(player_entity));
+    log.log_characters_turn(CharacterType::Player);
     let character_type_to_entity: Vec<_> = vec![
         (CharacterType::Player, player_entity),
         (CharacterType::Enemy(enemy), enemy_entity),
@@ -111,6 +151,7 @@ fn initialize_battle_system(
     .into_iter()
     .collect();
 
+    commands.insert_resource(log);
     commands.insert_resource(GeneCommandQueue::default());
     commands.insert_resource(CharacterTypeToEntity(character_type_to_entity));
 
@@ -125,10 +166,11 @@ fn character_acting_system(
     mut character_acting: ResMut<CharacterActing>,
     character_type_to_entity_map: Res<CharacterTypeToEntity>,
     mut query: Query<(Entity, &mut EnergyComponent)>,
-    mut remove_statuses_query: Query<(Entity, &mut BlockComponent)>,
+    mut remove_statuses_query: Query<(Entity, &mut BlockComponent, &mut StatusEffectComponent)>,
     mut pause_unpause_event_writer: EventWriter<PauseUnpauseEvent>,
     current_state: Res<State<NucleotideState>>,
     mut next_state: ResMut<NextState<NucleotideState>>,
+    mut log: ResMut<LogState>,
 ) {
     let (acting_entity, mut energy) = query.get_mut(character_acting.0).unwrap();
 
@@ -136,13 +178,20 @@ fn character_acting_system(
         energy.energy_remaining = energy.starting_energy;
         character_acting.0 = character_type_to_entity_map.get_next(acting_entity);
 
+        let character_type = character_type_to_entity_map.get_character_type(character_acting.0);
+        log.log_characters_turn(character_type);
         remove_statuses_query
             .iter_mut()
-            .filter(|(entity, _block)| entity == &character_acting.0)
-            .for_each(|(_entity, mut block)| block.0 = 0);
-    } else {
-        energy.energy_remaining -= 1;
+            .filter(|(entity, _block, _statuses)| entity == &character_acting.0)
+            .for_each(|(entity, mut block, mut statuses)| {
+                if entity == acting_entity {
+                    statuses.end_of_turn_clear();
+                } else {
+                    block.0 = 0; // TODO: Doesn't handle multiple enemies
+                }
+            });
     }
+    energy.energy_remaining -= 1;
 
     queue_next_state_if_not_already_queued(
         current_state.0,
@@ -158,8 +207,14 @@ fn handle_start_of_turn_statuses_system(
     mut pause_unpause_event_writer: EventWriter<PauseUnpauseEvent>,
     current_state: Res<State<NucleotideState>>,
     mut next_state: ResMut<NextState<NucleotideState>>,
+    mut log_state: ResMut<LogState>,
 ) {
-    handle_statuses(query, damage_event_writer, ActivationTiming::StartOfTurn);
+    handle_statuses(
+        query,
+        damage_event_writer,
+        ActivationTiming::StartOfTurn,
+        &mut log_state,
+    );
 
     queue_next_state_if_not_already_queued(
         current_state.0,
@@ -179,11 +234,13 @@ fn gene_loading_system(
     mut pause_unpause_event_writer: EventWriter<PauseUnpauseEvent>,
     current_state: Res<State<NucleotideState>>,
     mut next_state: ResMut<NextState<NucleotideState>>,
+    mut log: ResMut<LogState>,
 ) {
     let (acting_entity, genome, status_effects) = query.get_mut(character_acting.0).unwrap();
 
     let gene = genome.get_active_gene();
 
+    log.log_string(format!("Expressing {}.", gene));
     let gene_spec = gene_specs
         .0
         .get_spec_from_name(&gene)
@@ -226,30 +283,38 @@ fn handle_gene_commands_system(
     mut pause_unpause_event_writer: EventWriter<PauseUnpauseEvent>,
     mut gene_processing_event_writer: EventWriter<GeneProcessingEvent>,
     mut status_effect_event_writer: EventWriter<StatusEffectEvent>,
+    mut log_state: ResMut<LogState>,
     current_state: Res<State<NucleotideState>>,
     mut next_state: ResMut<NextState<NucleotideState>>,
 ) {
     for (gene_command, target_entity) in gene_command_queue.0.iter() {
         match gene_command {
-            GeneCommand::Damage(damage) => {
-                damage_event_writer.send(DamageEvent(*target_entity, *damage));
-            }
+            GeneCommand::Damage(damage) => log_and_send(
+                &mut log_state,
+                format!("{} damage dealt.", damage),
+                &mut damage_event_writer,
+                DamageEvent(*target_entity, *damage),
+            ),
             GeneCommand::Block(amount) => {
-                block_event_writer.send(BlockEvent(*target_entity, *amount));
+                log_and_send(
+                    &mut log_state,
+                    format!("{} damage blocked.", amount),
+                    &mut block_event_writer,
+                    BlockEvent(*target_entity, *amount),
+                );
             }
-            GeneCommand::ReverseGeneProcessing => {
-                gene_processing_event_writer.send(GeneProcessingEvent(
-                    *target_entity,
-                    GeneProcessingEventType::Reverse,
-                ));
-            }
-            GeneCommand::Status(effect, n_stacks) => {
-                status_effect_event_writer.send(StatusEffectEvent(
-                    *target_entity,
-                    *effect,
-                    *n_stacks,
-                ));
-            }
+            GeneCommand::ReverseGeneProcessing => log_and_send(
+                &mut log_state,
+                "Gene processing reversed.".to_string(),
+                &mut gene_processing_event_writer,
+                GeneProcessingEvent(*target_entity, GeneProcessingEventType::Reverse),
+            ),
+            GeneCommand::Status(effect, n_stacks) => log_and_send(
+                &mut log_state,
+                format!("{} stacks of {} applied.", n_stacks, effect.to_string()),
+                &mut status_effect_event_writer,
+                StatusEffectEvent(*target_entity, *effect, *n_stacks),
+            ),
             _ => panic!("Unimplemented Gene Command!"),
         }
     }
@@ -339,8 +404,14 @@ fn apply_status_effect_system(
 fn handle_end_of_turn_statuses_system(
     query: Query<(Entity, &mut StatusEffectComponent, &mut GenomeComponent)>,
     damage_event_writer: EventWriter<DamageEvent>,
+    mut log: ResMut<LogState>,
 ) {
-    handle_statuses(query, damage_event_writer, ActivationTiming::EndOfTurn);
+    handle_statuses(
+        query,
+        damage_event_writer,
+        ActivationTiming::EndOfTurn,
+        &mut log,
+    );
 }
 
 fn finished_handling_gene_system(
@@ -434,6 +505,7 @@ fn clean_up_after_battle(
 // End Systems
 
 // Components
+
 #[derive(Component, Clone, Copy)]
 pub struct PlayerComponent;
 
@@ -584,6 +656,19 @@ impl StatusEffectComponent {
             self.0.push((status_effect, n_stacks));
         }
     }
+
+    pub fn clear(&mut self) {
+        self.0 = Vec::new();
+    }
+
+    pub fn end_of_turn_clear(&mut self) {
+        self.0 = self
+            .0
+            .clone()
+            .into_iter()
+            .filter(|(s, _)| s.clears_after_turn())
+            .collect()
+    }
 }
 
 // End Components
@@ -666,6 +751,7 @@ fn handle_statuses(
     mut query: Query<(Entity, &mut StatusEffectComponent, &mut GenomeComponent)>,
     mut damage_event_writer: EventWriter<DamageEvent>,
     activation_timing: ActivationTiming,
+    mut log: &mut ResMut<LogState>,
 ) {
     for (entity, mut status_effect, mut genome) in query.iter_mut() {
         status_effect
@@ -676,7 +762,12 @@ fn handle_statuses(
                 }
                 match status_effect_type {
                     StatusEffect::Poison => {
-                        damage_event_writer.send(DamageEvent(entity, *n_stacks));
+                        log_and_send(
+                            &mut log,
+                            format!("Poison deals {} damage.", n_stacks),
+                            &mut damage_event_writer,
+                            DamageEvent(entity, *n_stacks),
+                        );
                         *n_stacks -= 1;
                     }
                     StatusEffect::RepeatGene => {
@@ -724,6 +815,16 @@ fn force_next_state(
         next_state_to_queue, current_state, next_state.0
     );
     next_state.0 = Some(next_state_to_queue);
+}
+
+fn log_and_send<E: Send + Sync + Event>(
+    log_state: &mut LogState,
+    message: String,
+    writer: &mut EventWriter<E>,
+    event: E,
+) {
+    log_state.log_string(message);
+    writer.send(event);
 }
 
 // End Helper Functions

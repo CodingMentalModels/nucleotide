@@ -101,9 +101,16 @@ fn render_battle_system(
 
     let ctx = contexts.ctx_mut();
 
-    egui::TopBottomPanel::bottom("log-panel").show(ctx, |mut ui| {
-        ui.label(get_underlined_text("Log".to_string()));
-        render_log(&mut ui, &log_state);
+    egui::TopBottomPanel::bottom("bottom-panel").show(ctx, |ui| {
+        egui::SidePanel::left("log-panel")
+            .min_width(LOG_WINDOW_SIZE.0)
+            .show_inside(ui, |mut ui| {
+                render_log(&mut ui, &log_state);
+            });
+
+        egui::CentralPanel::default().show_inside(ui, |mut ui| {
+            render_actions(&mut ui);
+        });
     });
 
     egui::TopBottomPanel::top("battle-panel").show(contexts.ctx_mut(), |ui| {
@@ -332,6 +339,7 @@ fn render_victory_system(ui_state: Res<VictoryUIState>, mut contexts: EguiContex
             });
         });
 }
+
 // Helper Functions
 fn render_character(ui: &mut Ui, character_state: CharacterUIState, character_type: CharacterType) {
     let heading = match character_type {
@@ -377,8 +385,7 @@ fn render_character(ui: &mut Ui, character_state: CharacterUIState, character_ty
 }
 
 fn render_log(ui: &mut Ui, log_state: &LogState) {
-    let log_window_size = egui::Vec2::new(LOG_WINDOW_SIZE.0, LOG_WINDOW_SIZE.1);
-
+    ui.label(get_underlined_text("Log".to_string()));
     egui::ScrollArea::vertical()
         .auto_shrink([false, false])
         .min_scrolled_height(LOG_WINDOW_SIZE.1)
@@ -388,6 +395,10 @@ fn render_log(ui: &mut Ui, log_state: &LogState) {
                 ui.label(log_message);
             }
         });
+}
+
+fn render_actions(ui: &mut Ui) {
+    ui.label(get_underlined_text("Actions".to_string()));
 }
 
 fn render_options(

@@ -124,6 +124,15 @@ impl StatusEffect {
         }
         .to_string()
     }
+
+    pub fn clears_after_turn(&self) -> bool {
+        match self {
+            StatusEffect::Poison => false,
+            StatusEffect::Weak => false,
+            StatusEffect::Constricted => false,
+            StatusEffect::RepeatGene => true,
+        }
+    }
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]

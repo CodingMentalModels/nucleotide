@@ -183,9 +183,12 @@ fn character_acting_system(
         remove_statuses_query
             .iter_mut()
             .filter(|(entity, _block, _statuses)| entity == &character_acting.0)
-            .for_each(|(_entity, mut block, mut statuses)| {
-                block.0 = 0;
-                statuses.clear();
+            .for_each(|(entity, mut block, mut statuses)| {
+                if entity == acting_entity {
+                    statuses.end_of_turn_clear();
+                } else {
+                    block.0 = 0; // TODO: Doesn't handle multiple enemies
+                }
             });
     }
     energy.energy_remaining -= 1;
@@ -656,6 +659,15 @@ impl StatusEffectComponent {
 
     pub fn clear(&mut self) {
         self.0 = Vec::new();
+    }
+
+    pub fn end_of_turn_clear(&mut self) {
+        self.0 = self
+            .0
+            .clone()
+            .into_iter()
+            .filter(|(s, _)| s.clears_after_turn())
+            .collect()
     }
 }
 

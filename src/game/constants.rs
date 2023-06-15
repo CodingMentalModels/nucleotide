@@ -1,5 +1,4 @@
 // Filepaths
-pub const FONT_DIRECTORY: &str = "assets/fonts/";
 pub const ENEMY_SPEC_DIRECTORY: &str = "assets/specs/enemies/";
 pub const GENE_SPEC_DIRECTORY: &str = "assets/specs/genes/";
 
@@ -10,7 +9,6 @@ pub const STARTING_PLAYER_HEALTH: u8 = 100;
 // UI
 pub const PLAYER_WINDOW_SIZE: (f32, f32) = (300.0, 200.0);
 pub const ENEMY_WINDOW_SIZE: (f32, f32) = (150.0, 100.0);
-pub const CHARACTER_WINDOW_OFFSET: f32 = 20.;
 pub const OPTION_CARD_SIZE: (f32, f32) = (100., 200.);
 pub const DEFAULT_FONT_SIZE: f32 = 28.;
 pub const LOG_WINDOW_SIZE: (f32, f32) = (300.0, 300.0);

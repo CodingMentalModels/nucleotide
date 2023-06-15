@@ -7,6 +7,7 @@ use crate::game::constants::*;
 use crate::game::resources::*;
 
 use super::battle::{GenomeComponent, LogState};
+use super::events::BattleActionEvent;
 use super::ui_state::{
     CharacterUIState, GameOverUIState, GenomeUIState, InBattleUIState, MoveGeneUIState,
     PausedUIState, SelectBattleRewardUIState, SwapGenesUIState, VictoryUIState,
@@ -20,6 +21,7 @@ impl Plugin for UIPlugin {
         let get_battle_states_condition = || {
             in_state(NucleotideState::Paused)
                 .or_else(in_state(NucleotideState::CharacterActing))
+                .or_else(in_state(NucleotideState::AwaitingBattleInput))
                 .or_else(in_state(NucleotideState::StartOfTurn))
                 .or_else(in_state(NucleotideState::GeneLoading))
                 .or_else(in_state(NucleotideState::GeneCommandHandling))
@@ -90,6 +92,8 @@ fn render_battle_system(
     mut contexts: EguiContexts,
     log_state: Res<LogState>,
     character_type_to_entity: Res<CharacterTypeToEntity>,
+    mut battle_actions_event_writer: EventWriter<BattleActionEvent>,
+    battle_actions: Res<BattleActions>,
 ) {
     let player_size = egui::Vec2::new(PLAYER_WINDOW_SIZE.0, PLAYER_WINDOW_SIZE.1);
     let enemy_size = egui::Vec2::new(ENEMY_WINDOW_SIZE.0, ENEMY_WINDOW_SIZE.1);
@@ -109,7 +113,7 @@ fn render_battle_system(
             });
 
         egui::CentralPanel::default().show_inside(ui, |mut ui| {
-            render_actions(&mut ui);
+            render_actions(&mut ui, &mut battle_actions_event_writer, battle_actions);
         });
     });
 
@@ -397,8 +401,26 @@ fn render_log(ui: &mut Ui, log_state: &LogState) {
         });
 }
 
-fn render_actions(ui: &mut Ui) {
+fn render_actions(
+    ui: &mut Ui,
+    event_writer: &mut EventWriter<BattleActionEvent>,
+    actions: Res<BattleActions>,
+) {
     ui.label(get_underlined_text("Actions".to_string()));
+
+    let n_columns = actions.0.len();
+    let button_size = egui::Vec2::new(OPTION_CARD_SIZE.0, OPTION_CARD_SIZE.1);
+    ui.columns(n_columns, |columns| {
+        for i in 0..n_columns {
+            let text = egui::RichText::new(actions.0[i].to_string()).size(DEFAULT_FONT_SIZE);
+            if columns[i]
+                .add(egui::Button::new(text).min_size(button_size.into()))
+                .clicked()
+            {
+                event_writer.send(actions.0[i]);
+            }
+        }
+    });
 }
 
 fn render_options(

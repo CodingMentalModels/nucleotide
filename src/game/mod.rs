@@ -1,6 +1,7 @@
 pub mod assets;
 pub mod battle;
 pub mod constants;
+pub mod events;
 pub mod input;
 pub mod meta;
 pub mod pause;

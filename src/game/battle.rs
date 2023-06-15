@@ -1,9 +1,9 @@
 use bevy::prelude::*;
 
 use crate::game::constants::*;
-use crate::game::input::PauseUnpauseEvent;
 use crate::game::resources::*;
 
+use super::events::BattleActionEvent;
 use super::specs::ActivationTiming;
 use super::specs::EnemyName;
 use super::specs::StatusEffect;
@@ -29,9 +29,13 @@ impl Plugin for BattlePlugin {
             .add_event::<BlockEvent>()
             .add_event::<GeneProcessingEvent>()
             .add_event::<StatusEffectEvent>()
+            .add_event::<BattleActionEvent>()
             .add_systems((
                 initialize_battle_system.in_schedule(OnEnter(NucleotideState::InitializingBattle)),
                 character_acting_system.in_schedule(OnEnter(NucleotideState::CharacterActing)),
+                fetch_battle_actions_system
+                    .in_schedule(OnEnter(NucleotideState::AwaitingBattleInput)),
+                handle_battle_actions_system.run_if(in_state(NucleotideState::AwaitingBattleInput)),
                 handle_start_of_turn_statuses_system
                     .in_schedule(OnEnter(NucleotideState::StartOfTurn)),
                 gene_loading_system.in_schedule(OnEnter(NucleotideState::GeneLoading)),
@@ -39,6 +43,8 @@ impl Plugin for BattlePlugin {
                     .in_schedule(OnEnter(NucleotideState::GeneCommandHandling)),
                 handle_damage_system.run_if(get_event_handling_system_condition()),
                 update_block_system.run_if(get_event_handling_system_condition()),
+            ))
+            .add_systems((
                 update_gene_processing_system.run_if(get_event_handling_system_condition()),
                 apply_status_effect_system.run_if(in_state(NucleotideState::GeneCommandHandling)),
                 handle_end_of_turn_statuses_system.in_schedule(OnEnter(NucleotideState::EndOfTurn)),
@@ -152,6 +158,7 @@ fn initialize_battle_system(
     .collect();
 
     commands.insert_resource(log);
+    commands.insert_resource(BattleActions(Vec::new()));
     commands.insert_resource(GeneCommandQueue::default());
     commands.insert_resource(CharacterTypeToEntity(character_type_to_entity));
 
@@ -167,7 +174,6 @@ fn character_acting_system(
     character_type_to_entity_map: Res<CharacterTypeToEntity>,
     mut query: Query<(Entity, &mut EnergyComponent)>,
     mut remove_statuses_query: Query<(Entity, &mut BlockComponent, &mut StatusEffectComponent)>,
-    mut pause_unpause_event_writer: EventWriter<PauseUnpauseEvent>,
     current_state: Res<State<NucleotideState>>,
     mut next_state: ResMut<NextState<NucleotideState>>,
     mut log: ResMut<LogState>,
@@ -196,15 +202,38 @@ fn character_acting_system(
     queue_next_state_if_not_already_queued(
         current_state.0,
         &mut next_state,
-        NucleotideState::StartOfTurn,
+        NucleotideState::AwaitingBattleInput,
     );
-    pause_unpause_event_writer.send(PauseUnpauseEvent);
+}
+
+fn fetch_battle_actions_system(
+    character_type_to_entity_map: Res<CharacterTypeToEntity>,
+    mut battle_actions: ResMut<BattleActions>,
+) {
+    battle_actions.0 = vec![BattleActionEvent::Continue];
+}
+
+fn handle_battle_actions_system(
+    mut battle_action_event_reader: EventReader<BattleActionEvent>,
+    current_state: Res<State<NucleotideState>>,
+    mut next_state: ResMut<NextState<NucleotideState>>,
+) {
+    for event in battle_action_event_reader.iter() {
+        match event {
+            BattleActionEvent::Continue => {
+                queue_next_state_if_not_already_queued(
+                    current_state.0,
+                    &mut next_state,
+                    NucleotideState::StartOfTurn,
+                );
+            }
+        }
+    }
 }
 
 fn handle_start_of_turn_statuses_system(
     query: Query<(Entity, &mut StatusEffectComponent, &mut GenomeComponent)>,
     damage_event_writer: EventWriter<DamageEvent>,
-    mut pause_unpause_event_writer: EventWriter<PauseUnpauseEvent>,
     current_state: Res<State<NucleotideState>>,
     mut next_state: ResMut<NextState<NucleotideState>>,
     mut log_state: ResMut<LogState>,
@@ -221,8 +250,6 @@ fn handle_start_of_turn_statuses_system(
         &mut next_state,
         NucleotideState::GeneLoading,
     );
-
-    pause_unpause_event_writer.send(PauseUnpauseEvent);
 }
 
 fn gene_loading_system(
@@ -231,7 +258,6 @@ fn gene_loading_system(
     mut gene_command_queue: ResMut<GeneCommandQueue>,
     gene_specs: Res<GeneSpecs>,
     mut query: Query<(Entity, &mut GenomeComponent, &StatusEffectComponent)>,
-    mut pause_unpause_event_writer: EventWriter<PauseUnpauseEvent>,
     current_state: Res<State<NucleotideState>>,
     mut next_state: ResMut<NextState<NucleotideState>>,
     mut log: ResMut<LogState>,
@@ -273,14 +299,12 @@ fn gene_loading_system(
         &mut next_state,
         NucleotideState::GeneCommandHandling,
     );
-    pause_unpause_event_writer.send(PauseUnpauseEvent);
 }
 
 fn handle_gene_commands_system(
     mut gene_command_queue: ResMut<GeneCommandQueue>,
     mut damage_event_writer: EventWriter<DamageEvent>,
     mut block_event_writer: EventWriter<BlockEvent>,
-    mut pause_unpause_event_writer: EventWriter<PauseUnpauseEvent>,
     mut gene_processing_event_writer: EventWriter<GeneProcessingEvent>,
     mut status_effect_event_writer: EventWriter<StatusEffectEvent>,
     mut log_state: ResMut<LogState>,
@@ -326,7 +350,6 @@ fn handle_gene_commands_system(
         &mut next_state,
         NucleotideState::EndOfTurn,
     );
-    pause_unpause_event_writer.send(PauseUnpauseEvent);
 }
 
 fn handle_damage_system(

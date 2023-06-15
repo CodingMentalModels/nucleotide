@@ -408,16 +408,25 @@ fn render_actions(
 ) {
     ui.label(get_underlined_text("Actions".to_string()));
 
-    let n_columns = actions.0.len();
+    let n_columns = if actions.0.len() < MAX_ACTION_BUTTONS {
+        MAX_ACTION_BUTTONS
+    } else {
+        actions.0.len()
+    };
+
     let button_size = egui::Vec2::new(OPTION_CARD_SIZE.0, OPTION_CARD_SIZE.1);
     ui.columns(n_columns, |columns| {
         for i in 0..n_columns {
-            let text = egui::RichText::new(actions.0[i].to_string()).size(DEFAULT_FONT_SIZE);
-            if columns[i]
-                .add(egui::Button::new(text).min_size(button_size.into()))
-                .clicked()
-            {
-                event_writer.send(actions.0[i]);
+            if i < actions.0.len() {
+                let text = egui::RichText::new(actions.0[i].to_string()).size(DEFAULT_FONT_SIZE);
+                if columns[i]
+                    .add(egui::Button::new(text).min_size(button_size.into()))
+                    .clicked()
+                {
+                    event_writer.send(actions.0[i]);
+                }
+            } else {
+                // Do nothing
             }
         }
     });

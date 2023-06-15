@@ -113,7 +113,7 @@ fn render_battle_system(
                 render_character(
                     ui,
                     enemy_state,
-                    CharacterType::Enemy("EnemyName".to_string()),
+                    CharacterType::Enemy(enemy_character_type.to_string()),
                 );
             });
 

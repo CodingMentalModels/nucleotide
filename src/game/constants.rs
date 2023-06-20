@@ -5,6 +5,7 @@ pub const GENE_SPEC_DIRECTORY: &str = "assets/specs/genes/";
 // Game Parameters
 pub const STARTING_PLAYER_ENERGY: u8 = 3;
 pub const STARTING_PLAYER_HEALTH: u8 = 100;
+pub const ENERGY_COST_TO_RUN_AWAY: u8 = 5;
 
 // UI
 pub const PLAYER_WINDOW_SIZE: (f32, f32) = (300.0, 200.0);

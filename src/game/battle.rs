@@ -26,7 +26,8 @@ impl Plugin for BattlePlugin {
                 .or_else(in_state(NucleotideState::EndOfTurn))
         };
 
-        app.add_event::<DamageEvent>()
+        app.add_event::<RanAwayEvent>()
+            .add_event::<DamageEvent>()
             .add_event::<BlockEvent>()
             .add_event::<GeneProcessingEvent>()
             .add_event::<StatusEffectEvent>()
@@ -42,6 +43,9 @@ impl Plugin for BattlePlugin {
                 gene_loading_system.in_schedule(OnEnter(NucleotideState::GeneLoading)),
                 handle_gene_commands_system
                     .in_schedule(OnEnter(NucleotideState::GeneCommandHandling)),
+            ))
+            .add_systems((
+                handle_ran_away_system.run_if(get_event_handling_system_condition()),
                 handle_damage_system.run_if(get_event_handling_system_condition()),
                 update_block_system.run_if(get_event_handling_system_condition()),
             ))
@@ -107,6 +111,8 @@ impl LogState {
 // End Resources
 
 // Events
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+struct RanAwayEvent(Entity);
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 struct DamageEvent(TargetEntity, u8);
@@ -210,32 +216,44 @@ fn character_acting_system(
 }
 
 fn fetch_battle_actions_system(
-    character_type_to_entity_map: Res<CharacterTypeToEntity>,
+    status_query: Query<(&StatusEffectComponent, With<PlayerComponent>)>,
     mut battle_actions: ResMut<BattleActions>,
 ) {
-    battle_actions.0 = vec![BattleActionEvent::Continue];
+    let is_running = status_query.single().0.contains(&StatusEffect::RunningAway);
+    if is_running {
+        battle_actions.0 = vec![BattleActionEvent::Continue];
+    } else {
+        battle_actions.0 = vec![BattleActionEvent::Continue, BattleActionEvent::RunAway];
+    }
 }
 
 fn handle_battle_actions_system(
+    mut player_query: Query<&mut StatusEffectComponent, With<PlayerComponent>>,
     mut battle_action_event_reader: EventReader<BattleActionEvent>,
     current_state: Res<State<NucleotideState>>,
     mut next_state: ResMut<NextState<NucleotideState>>,
+    mut log: ResMut<LogState>,
 ) {
     for event in battle_action_event_reader.iter() {
         match event {
-            BattleActionEvent::Continue => {
-                queue_next_state_if_not_already_queued(
-                    current_state.0,
-                    &mut next_state,
-                    NucleotideState::StartOfTurn,
-                );
+            BattleActionEvent::Continue => {}
+            BattleActionEvent::RunAway => {
+                let mut status_effects = player_query.single_mut();
+                status_effects.add(StatusEffect::RunningAway, ENERGY_COST_TO_RUN_AWAY);
+                log.log_string("Running away!".to_string());
             }
         }
+        queue_next_state_if_not_already_queued(
+            current_state.0,
+            &mut next_state,
+            NucleotideState::StartOfTurn,
+        );
     }
 }
 
 fn handle_start_of_turn_statuses_system(
     query: Query<(Entity, &mut StatusEffectComponent, &mut GenomeComponent)>,
+    ran_away_event_writer: EventWriter<RanAwayEvent>,
     damage_event_writer: EventWriter<DamageEvent>,
     current_state: Res<State<NucleotideState>>,
     mut next_state: ResMut<NextState<NucleotideState>>,
@@ -243,6 +261,7 @@ fn handle_start_of_turn_statuses_system(
 ) {
     handle_statuses(
         query,
+        ran_away_event_writer,
         damage_event_writer,
         ActivationTiming::StartOfTurn,
         &mut log_state,
@@ -355,6 +374,25 @@ fn handle_gene_commands_system(
     );
 }
 
+fn handle_ran_away_system(
+    mut ran_away_event_reader: EventReader<RanAwayEvent>,
+    character_type_to_entity_map: Res<CharacterTypeToEntity>,
+    current_state: Res<State<NucleotideState>>,
+    mut next_state: ResMut<NextState<NucleotideState>>,
+    mut battle_reward_ui_state: ResMut<SelectBattleRewardUIState>,
+) {
+    for entity in ran_away_event_reader.iter() {
+        if character_type_to_entity_map.is_player(entity.0) {
+            *battle_reward_ui_state = SelectBattleRewardUIState::after_running_away();
+            force_next_state(
+                current_state.0,
+                &mut next_state,
+                NucleotideState::SelectBattleReward,
+            );
+        }
+    }
+}
+
 fn handle_damage_system(
     mut query: Query<(Entity, &mut HealthComponent, &mut BlockComponent)>,
     mut damage_event_reader: EventReader<DamageEvent>,
@@ -377,19 +415,8 @@ fn handle_damage_system(
                         NucleotideState::GameOver,
                     ),
                     CharacterType::Enemy(_) => {
-                        let options = vec![
-                            (
-                                "Choose new Gene from Enemy".to_string(),
-                                NucleotideState::SelectGeneFromEnemy,
-                            ),
-                            ("Move a Gene".to_string(), NucleotideState::MoveGene),
-                            ("Swap two Genes".to_string(), NucleotideState::SwapGenes),
-                            (
-                                "Research a Gene".to_string(),
-                                NucleotideState::InitializingBattle,
-                            ),
-                        ];
-                        *battle_reward_ui_state = SelectBattleRewardUIState(options);
+                        *battle_reward_ui_state =
+                            SelectBattleRewardUIState::after_defeating_enemy();
                         force_next_state(
                             // TODO: This doesn't handle multiple enemies at all -- if one dies, battle
                             // over
@@ -445,11 +472,13 @@ fn apply_status_effect_system(
 
 fn handle_end_of_turn_statuses_system(
     query: Query<(Entity, &mut StatusEffectComponent, &mut GenomeComponent)>,
+    ran_away_event_writer: EventWriter<RanAwayEvent>,
     damage_event_writer: EventWriter<DamageEvent>,
     mut log: ResMut<LogState>,
 ) {
     handle_statuses(
         query,
+        ran_away_event_writer,
         damage_event_writer,
         ActivationTiming::EndOfTurn,
         &mut log,
@@ -791,6 +820,7 @@ fn get_targets(
 
 fn handle_statuses(
     mut query: Query<(Entity, &mut StatusEffectComponent, &mut GenomeComponent)>,
+    mut ran_away_event_writer: EventWriter<RanAwayEvent>,
     mut damage_event_writer: EventWriter<DamageEvent>,
     activation_timing: ActivationTiming,
     mut log: &mut ResMut<LogState>,
@@ -803,6 +833,12 @@ fn handle_statuses(
                     return true;
                 }
                 match status_effect_type {
+                    StatusEffect::RunningAway => {
+                        *n_stacks -= 1;
+                        if n_stacks == &mut 0 {
+                            ran_away_event_writer.send(RanAwayEvent(entity))
+                        }
+                    }
                     StatusEffect::Poison => {
                         log_and_send(
                             &mut log,

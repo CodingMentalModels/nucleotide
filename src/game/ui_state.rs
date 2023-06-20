@@ -142,7 +142,7 @@ impl GeneUIState {
 pub struct PausedUIState;
 
 #[derive(Debug, Default, Clone, PartialEq, Eq, Hash, Resource)]
-pub struct SelectBattleRewardUIState;
+pub struct SelectBattleRewardUIState(pub Vec<(String, NucleotideState)>);
 
 #[derive(Debug, Default, Clone, PartialEq, Eq, Hash, Resource)]
 pub struct SelectGeneFromEnemyUIState;

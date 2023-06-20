@@ -148,19 +148,11 @@ fn render_select_reward_system(
     mut contexts: EguiContexts,
 ) {
     let heading = "Select Battle Reward";
-    let options = vec![
-        "Choose new Gene from Enemy".to_string(),
-        "Move a Gene".to_string(),
-        "Swap two Genes".to_string(),
-        "Research a Gene".to_string(),
-    ];
-    let on_click = |s: usize| match s {
-        0 => commands.insert_resource(NextState(Some(NucleotideState::SelectGeneFromEnemy))),
-        1 => commands.insert_resource(NextState(Some(NucleotideState::MoveGene))),
-        2 => commands.insert_resource(NextState(Some(NucleotideState::SwapGenes))),
-        3 => {}
-        v => panic!("Bad value: {}", v),
-    };
+    let (options, states): (Vec<String>, Vec<NucleotideState>) = (
+        ui_state.0.clone().into_iter().map(|(n, _)| n).collect(),
+        ui_state.0.clone().into_iter().map(|(_, s)| s).collect(),
+    );
+    let on_click = |n: usize| commands.insert_resource(NextState(Some(states[n])));
     render_options(&mut contexts, heading, options, on_click, Vec::new());
 }
 

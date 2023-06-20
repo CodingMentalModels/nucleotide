@@ -12,6 +12,7 @@ use super::ui_state::CharacterUIState;
 use super::ui_state::GeneUIState;
 use super::ui_state::GenomeUIState;
 use super::ui_state::InBattleUIState;
+use super::ui_state::SelectBattleRewardUIState;
 
 pub type TargetEntity = Entity;
 
@@ -45,6 +46,8 @@ impl Plugin for BattlePlugin {
                 update_block_system.run_if(get_event_handling_system_condition()),
             ))
             .add_systems((
+                // Need multiple calls to add_systems in order to satisfy the trait
+                // requirements
                 update_gene_processing_system.run_if(get_event_handling_system_condition()),
                 apply_status_effect_system.run_if(in_state(NucleotideState::GeneCommandHandling)),
                 handle_end_of_turn_statuses_system.in_schedule(OnEnter(NucleotideState::EndOfTurn)),
@@ -358,6 +361,7 @@ fn handle_damage_system(
     character_type_to_entity: Res<CharacterTypeToEntity>,
     current_state: Res<State<NucleotideState>>,
     mut next_state: ResMut<NextState<NucleotideState>>,
+    mut battle_reward_ui_state: ResMut<SelectBattleRewardUIState>,
 ) {
     for damage_event in damage_event_reader.iter() {
         if let Ok((entity, mut health, mut block)) = query.get_mut(damage_event.0) {
@@ -372,13 +376,28 @@ fn handle_damage_system(
                         &mut next_state,
                         NucleotideState::GameOver,
                     ),
-                    CharacterType::Enemy(_) => force_next_state(
-                        // TODO: This doesn't handle multiple enemies at all -- if one dies, battle
-                        // over
-                        current_state.0,
-                        &mut next_state,
-                        NucleotideState::SelectBattleReward,
-                    ),
+                    CharacterType::Enemy(_) => {
+                        let options = vec![
+                            (
+                                "Choose new Gene from Enemy".to_string(),
+                                NucleotideState::SelectGeneFromEnemy,
+                            ),
+                            ("Move a Gene".to_string(), NucleotideState::MoveGene),
+                            ("Swap two Genes".to_string(), NucleotideState::SwapGenes),
+                            (
+                                "Research a Gene".to_string(),
+                                NucleotideState::InitializingBattle,
+                            ),
+                        ];
+                        *battle_reward_ui_state = SelectBattleRewardUIState(options);
+                        force_next_state(
+                            // TODO: This doesn't handle multiple enemies at all -- if one dies, battle
+                            // over
+                            current_state.0,
+                            &mut next_state,
+                            NucleotideState::SelectBattleReward,
+                        );
+                    }
                 }
             }
         }

@@ -99,6 +99,7 @@ pub enum GeneCommand {
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
 pub enum StatusEffect {
+    RunningAway,
     Poison,
     Weak,
     Constricted,
@@ -108,6 +109,7 @@ pub enum StatusEffect {
 impl StatusEffect {
     pub fn get_activation_timing(&self) -> ActivationTiming {
         match self {
+            StatusEffect::RunningAway => ActivationTiming::EndOfTurn,
             StatusEffect::Poison => ActivationTiming::EndOfTurn,
             StatusEffect::Weak => ActivationTiming::EndOfTurn,
             StatusEffect::Constricted => ActivationTiming::NotApplicable,
@@ -117,6 +119,7 @@ impl StatusEffect {
 
     pub fn to_string(&self) -> String {
         match self {
+            StatusEffect::RunningAway => "Running Away",
             StatusEffect::Poison => "Poison",
             StatusEffect::Weak => "Weak",
             StatusEffect::Constricted => "Constricted",
@@ -127,6 +130,7 @@ impl StatusEffect {
 
     pub fn clears_after_turn(&self) -> bool {
         match self {
+            StatusEffect::RunningAway => false,
             StatusEffect::Poison => false,
             StatusEffect::Weak => false,
             StatusEffect::Constricted => false,

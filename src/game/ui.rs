@@ -7,6 +7,7 @@ use crate::game::constants::*;
 use crate::game::resources::*;
 
 use super::battle::{GenomeComponent, LogState};
+use super::events::BattleActionEvent;
 use super::ui_state::{
     CharacterUIState, GameOverUIState, GenomeUIState, InBattleUIState, MoveGeneUIState,
     PausedUIState, SelectBattleRewardUIState, SwapGenesUIState, VictoryUIState,
@@ -20,6 +21,7 @@ impl Plugin for UIPlugin {
         let get_battle_states_condition = || {
             in_state(NucleotideState::Paused)
                 .or_else(in_state(NucleotideState::CharacterActing))
+                .or_else(in_state(NucleotideState::AwaitingBattleInput))
                 .or_else(in_state(NucleotideState::StartOfTurn))
                 .or_else(in_state(NucleotideState::GeneLoading))
                 .or_else(in_state(NucleotideState::GeneCommandHandling))
@@ -90,6 +92,8 @@ fn render_battle_system(
     mut contexts: EguiContexts,
     log_state: Res<LogState>,
     character_type_to_entity: Res<CharacterTypeToEntity>,
+    mut battle_actions_event_writer: EventWriter<BattleActionEvent>,
+    battle_actions: Res<BattleActions>,
 ) {
     let player_size = egui::Vec2::new(PLAYER_WINDOW_SIZE.0, PLAYER_WINDOW_SIZE.1);
     let enemy_size = egui::Vec2::new(ENEMY_WINDOW_SIZE.0, ENEMY_WINDOW_SIZE.1);
@@ -101,9 +105,16 @@ fn render_battle_system(
 
     let ctx = contexts.ctx_mut();
 
-    egui::TopBottomPanel::bottom("log-panel").show(ctx, |mut ui| {
-        ui.label(get_underlined_text("Log".to_string()));
-        render_log(&mut ui, &log_state);
+    egui::TopBottomPanel::bottom("bottom-panel").show(ctx, |ui| {
+        egui::SidePanel::left("log-panel")
+            .min_width(LOG_WINDOW_SIZE.0)
+            .show_inside(ui, |mut ui| {
+                render_log(&mut ui, &log_state);
+            });
+
+        egui::CentralPanel::default().show_inside(ui, |mut ui| {
+            render_actions(&mut ui, &mut battle_actions_event_writer, battle_actions);
+        });
     });
 
     egui::TopBottomPanel::top("battle-panel").show(contexts.ctx_mut(), |ui| {
@@ -137,19 +148,11 @@ fn render_select_reward_system(
     mut contexts: EguiContexts,
 ) {
     let heading = "Select Battle Reward";
-    let options = vec![
-        "Choose new Gene from Enemy".to_string(),
-        "Move a Gene".to_string(),
-        "Swap two Genes".to_string(),
-        "Research a Gene".to_string(),
-    ];
-    let on_click = |s: usize| match s {
-        0 => commands.insert_resource(NextState(Some(NucleotideState::SelectGeneFromEnemy))),
-        1 => commands.insert_resource(NextState(Some(NucleotideState::MoveGene))),
-        2 => commands.insert_resource(NextState(Some(NucleotideState::SwapGenes))),
-        3 => {}
-        v => panic!("Bad value: {}", v),
-    };
+    let (options, states): (Vec<String>, Vec<NucleotideState>) = (
+        ui_state.0.clone().into_iter().map(|(n, _)| n).collect(),
+        ui_state.0.clone().into_iter().map(|(_, s)| s).collect(),
+    );
+    let on_click = |n: usize| commands.insert_resource(NextState(Some(states[n])));
     render_options(&mut contexts, heading, options, on_click, Vec::new());
 }
 
@@ -332,6 +335,7 @@ fn render_victory_system(ui_state: Res<VictoryUIState>, mut contexts: EguiContex
             });
         });
 }
+
 // Helper Functions
 fn render_character(ui: &mut Ui, character_state: CharacterUIState, character_type: CharacterType) {
     let heading = match character_type {
@@ -377,8 +381,7 @@ fn render_character(ui: &mut Ui, character_state: CharacterUIState, character_ty
 }
 
 fn render_log(ui: &mut Ui, log_state: &LogState) {
-    let log_window_size = egui::Vec2::new(LOG_WINDOW_SIZE.0, LOG_WINDOW_SIZE.1);
-
+    ui.label(get_underlined_text("Log".to_string()));
     egui::ScrollArea::vertical()
         .auto_shrink([false, false])
         .min_scrolled_height(LOG_WINDOW_SIZE.1)
@@ -388,6 +391,37 @@ fn render_log(ui: &mut Ui, log_state: &LogState) {
                 ui.label(log_message);
             }
         });
+}
+
+fn render_actions(
+    ui: &mut Ui,
+    event_writer: &mut EventWriter<BattleActionEvent>,
+    actions: Res<BattleActions>,
+) {
+    ui.label(get_underlined_text("Actions".to_string()));
+
+    let n_columns = if actions.0.len() < MAX_ACTION_BUTTONS {
+        MAX_ACTION_BUTTONS
+    } else {
+        actions.0.len()
+    };
+
+    let button_size = egui::Vec2::new(OPTION_CARD_SIZE.0, OPTION_CARD_SIZE.1);
+    ui.columns(n_columns, |columns| {
+        for i in 0..n_columns {
+            if i < actions.0.len() {
+                let text = egui::RichText::new(actions.0[i].to_string()).size(DEFAULT_FONT_SIZE);
+                if columns[i]
+                    .add(egui::Button::new(text).min_size(button_size.into()))
+                    .clicked()
+                {
+                    event_writer.send(actions.0[i]);
+                }
+            } else {
+                // Do nothing
+            }
+        }
+    });
 }
 
 fn render_options(

@@ -1,7 +1,7 @@
-use bevy::{prelude::*};
+use bevy::prelude::*;
 
+use crate::game::input::{input_system, PauseUnpauseEvent};
 use crate::game::resources::*;
-use crate::game::input::{PauseUnpauseEvent, input_system};
 
 pub struct PausePlugin;
 
@@ -14,26 +14,25 @@ impl Plugin for PausePlugin {
                 .or_else(in_state(NucleotideState::Drafting))
                 .or_else(in_state(NucleotideState::InitializingBattle))
                 .or_else(in_state(NucleotideState::CharacterActing))
+                .or_else(in_state(NucleotideState::AwaitingBattleInput))
                 .or_else(in_state(NucleotideState::StartOfTurn))
                 .or_else(in_state(NucleotideState::GeneLoading))
                 .or_else(in_state(NucleotideState::GeneCommandHandling))
                 .or_else(in_state(NucleotideState::FinishedGeneCommandHandling))
                 .or_else(in_state(NucleotideState::EndOfTurn))
                 .or_else(in_state(NucleotideState::GeneAnimating))
-            };
+        };
 
-        app
-            .insert_resource(PausedState(NucleotideState::Paused))
+        app.insert_resource(PausedState(NucleotideState::Paused))
             .add_system(
                 pause_system
                     .run_if(get_pause_states_condition())
-                    .before(input_system)
+                    .before(input_system),
             );
     }
 }
 
 // Components
-
 
 // End Components
 
@@ -59,3 +58,4 @@ fn pause_system(
 }
 
 // End Systems
+

@@ -5,7 +5,10 @@ use bevy::prelude::*;
 use crate::game::constants::*;
 use crate::game::specs::GeneCommand;
 
-use super::specs::{EnemyName, EnemySpec, GeneName, GeneSpec};
+use super::{
+    events::BattleActionEvent,
+    specs::{EnemyName, EnemySpec, GeneName, GeneSpec},
+};
 
 pub type Symbol = char;
 
@@ -23,6 +26,7 @@ pub enum NucleotideState {
     Drafting,
     InitializingBattle,
     CharacterActing,
+    AwaitingBattleInput,
     StartOfTurn,
     GeneLoading,
     GeneCommandHandling,
@@ -99,6 +103,9 @@ impl Player {
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash, Resource)]
 pub struct CharacterActing(pub Entity);
+
+#[derive(Debug, Clone, PartialEq, Eq, Hash, Resource)]
+pub struct BattleActions(pub Vec<BattleActionEvent>);
 
 #[derive(Debug, Default, Clone, PartialEq, Eq, Hash, Resource)]
 pub struct GeneCommandQueue(pub Vec<(GeneCommand, Entity)>);

@@ -1,9 +1,9 @@
 use bevy::prelude::*;
 
 use crate::game::constants::*;
-use crate::game::input::PauseUnpauseEvent;
 use crate::game::resources::*;
 
+use super::events::BattleActionEvent;
 use super::specs::ActivationTiming;
 use super::specs::EnemyName;
 use super::specs::StatusEffect;
@@ -12,6 +12,7 @@ use super::ui_state::CharacterUIState;
 use super::ui_state::GeneUIState;
 use super::ui_state::GenomeUIState;
 use super::ui_state::InBattleUIState;
+use super::ui_state::SelectBattleRewardUIState;
 
 pub type TargetEntity = Entity;
 
@@ -25,20 +26,32 @@ impl Plugin for BattlePlugin {
                 .or_else(in_state(NucleotideState::EndOfTurn))
         };
 
-        app.add_event::<DamageEvent>()
+        app.add_event::<RanAwayEvent>()
+            .add_event::<DamageEvent>()
             .add_event::<BlockEvent>()
             .add_event::<GeneProcessingEvent>()
             .add_event::<StatusEffectEvent>()
+            .add_event::<BattleActionEvent>()
             .add_systems((
                 initialize_battle_system.in_schedule(OnEnter(NucleotideState::InitializingBattle)),
                 character_acting_system.in_schedule(OnEnter(NucleotideState::CharacterActing)),
+                fetch_battle_actions_system
+                    .in_schedule(OnEnter(NucleotideState::AwaitingBattleInput)),
+                handle_battle_actions_system.run_if(in_state(NucleotideState::AwaitingBattleInput)),
                 handle_start_of_turn_statuses_system
                     .in_schedule(OnEnter(NucleotideState::StartOfTurn)),
                 gene_loading_system.in_schedule(OnEnter(NucleotideState::GeneLoading)),
                 handle_gene_commands_system
                     .in_schedule(OnEnter(NucleotideState::GeneCommandHandling)),
+            ))
+            .add_systems((
+                handle_ran_away_system.run_if(get_event_handling_system_condition()),
                 handle_damage_system.run_if(get_event_handling_system_condition()),
                 update_block_system.run_if(get_event_handling_system_condition()),
+            ))
+            .add_systems((
+                // Need multiple calls to add_systems in order to satisfy the trait
+                // requirements
                 update_gene_processing_system.run_if(get_event_handling_system_condition()),
                 apply_status_effect_system.run_if(in_state(NucleotideState::GeneCommandHandling)),
                 handle_end_of_turn_statuses_system.in_schedule(OnEnter(NucleotideState::EndOfTurn)),
@@ -98,6 +111,8 @@ impl LogState {
 // End Resources
 
 // Events
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+struct RanAwayEvent(Entity);
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 struct DamageEvent(TargetEntity, u8);
@@ -152,6 +167,7 @@ fn initialize_battle_system(
     .collect();
 
     commands.insert_resource(log);
+    commands.insert_resource(BattleActions(Vec::new()));
     commands.insert_resource(GeneCommandQueue::default());
     commands.insert_resource(CharacterTypeToEntity(character_type_to_entity));
 
@@ -167,7 +183,6 @@ fn character_acting_system(
     character_type_to_entity_map: Res<CharacterTypeToEntity>,
     mut query: Query<(Entity, &mut EnergyComponent)>,
     mut remove_statuses_query: Query<(Entity, &mut BlockComponent, &mut StatusEffectComponent)>,
-    mut pause_unpause_event_writer: EventWriter<PauseUnpauseEvent>,
     current_state: Res<State<NucleotideState>>,
     mut next_state: ResMut<NextState<NucleotideState>>,
     mut log: ResMut<LogState>,
@@ -196,21 +211,63 @@ fn character_acting_system(
     queue_next_state_if_not_already_queued(
         current_state.0,
         &mut next_state,
-        NucleotideState::StartOfTurn,
+        NucleotideState::AwaitingBattleInput,
     );
-    pause_unpause_event_writer.send(PauseUnpauseEvent);
+}
+
+fn fetch_battle_actions_system(
+    character_acting: Res<CharacterActing>,
+    character_type_to_entity_map: Res<CharacterTypeToEntity>,
+    status_query: Query<(&StatusEffectComponent, With<PlayerComponent>)>,
+    mut battle_actions: ResMut<BattleActions>,
+) {
+    let not_players_turn = !character_type_to_entity_map.is_player(character_acting.0);
+    let is_running = status_query.single().0.contains(&StatusEffect::RunningAway);
+
+    if not_players_turn || is_running {
+        battle_actions.0 = vec![BattleActionEvent::Continue];
+    } else {
+        battle_actions.0 = vec![BattleActionEvent::Continue, BattleActionEvent::RunAway];
+    }
+}
+
+fn handle_battle_actions_system(
+    mut player_query: Query<&mut StatusEffectComponent, With<PlayerComponent>>,
+    mut battle_action_event_reader: EventReader<BattleActionEvent>,
+    current_state: Res<State<NucleotideState>>,
+    mut next_state: ResMut<NextState<NucleotideState>>,
+    mut log: ResMut<LogState>,
+) {
+    for event in battle_action_event_reader.iter() {
+        match event {
+            BattleActionEvent::Continue => {}
+            BattleActionEvent::RunAway => {
+                let mut status_effects = player_query.single_mut();
+                status_effects.add(StatusEffect::RunningAway, ENERGY_COST_TO_RUN_AWAY);
+                log.log_string("Running away!".to_string());
+            }
+        }
+        queue_next_state_if_not_already_queued(
+            current_state.0,
+            &mut next_state,
+            NucleotideState::StartOfTurn,
+        );
+    }
 }
 
 fn handle_start_of_turn_statuses_system(
+    character_acting: Res<CharacterActing>,
     query: Query<(Entity, &mut StatusEffectComponent, &mut GenomeComponent)>,
+    ran_away_event_writer: EventWriter<RanAwayEvent>,
     damage_event_writer: EventWriter<DamageEvent>,
-    mut pause_unpause_event_writer: EventWriter<PauseUnpauseEvent>,
     current_state: Res<State<NucleotideState>>,
     mut next_state: ResMut<NextState<NucleotideState>>,
     mut log_state: ResMut<LogState>,
 ) {
     handle_statuses(
+        character_acting,
         query,
+        ran_away_event_writer,
         damage_event_writer,
         ActivationTiming::StartOfTurn,
         &mut log_state,
@@ -221,8 +278,6 @@ fn handle_start_of_turn_statuses_system(
         &mut next_state,
         NucleotideState::GeneLoading,
     );
-
-    pause_unpause_event_writer.send(PauseUnpauseEvent);
 }
 
 fn gene_loading_system(
@@ -231,56 +286,57 @@ fn gene_loading_system(
     mut gene_command_queue: ResMut<GeneCommandQueue>,
     gene_specs: Res<GeneSpecs>,
     mut query: Query<(Entity, &mut GenomeComponent, &StatusEffectComponent)>,
-    mut pause_unpause_event_writer: EventWriter<PauseUnpauseEvent>,
     current_state: Res<State<NucleotideState>>,
     mut next_state: ResMut<NextState<NucleotideState>>,
     mut log: ResMut<LogState>,
 ) {
     let (acting_entity, genome, status_effects) = query.get_mut(character_acting.0).unwrap();
 
-    let gene = genome.get_active_gene();
+    if status_effects.contains(&StatusEffect::RunningAway) {
+        log.log_string("Trying to run away.".to_string());
+    } else {
+        let gene = genome.get_active_gene();
 
-    log.log_string(format!("Expressing {}.", gene));
-    let gene_spec = gene_specs
-        .0
-        .get_spec_from_name(&gene)
-        .expect("Gene should exist as a gene spec.");
-    let targets = get_targets(
-        acting_entity,
-        character_type_to_entity_map,
-        gene_spec.get_target(),
-    );
+        log.log_string(format!("Expressing {}.", gene));
+        let gene_spec = gene_specs
+            .0
+            .get_spec_from_name(&gene)
+            .expect("Gene should exist as a gene spec.");
+        let targets = get_targets(
+            acting_entity,
+            character_type_to_entity_map,
+            gene_spec.get_target(),
+        );
 
-    gene_command_queue.0.append(
-        &mut gene_spec
-            .get_gene_commands()
-            .iter()
-            .filter(|gene_command| match gene_command {
-                GeneCommand::Damage(_) => !status_effects.contains(&StatusEffect::Constricted),
-                _ => true,
-            })
-            .map(|gene_command| {
-                targets
-                    .iter()
-                    .map(|target| (gene_command.clone(), target.clone()))
-            })
-            .flatten()
-            .collect(),
-    );
+        gene_command_queue.0.append(
+            &mut gene_spec
+                .get_gene_commands()
+                .iter()
+                .filter(|gene_command| match gene_command {
+                    GeneCommand::Damage(_) => !status_effects.contains(&StatusEffect::Constricted),
+                    _ => true,
+                })
+                .map(|gene_command| {
+                    targets
+                        .iter()
+                        .map(|target| (gene_command.clone(), target.clone()))
+                })
+                .flatten()
+                .collect(),
+        );
+    }
 
     queue_next_state_if_not_already_queued(
         current_state.0,
         &mut next_state,
         NucleotideState::GeneCommandHandling,
     );
-    pause_unpause_event_writer.send(PauseUnpauseEvent);
 }
 
 fn handle_gene_commands_system(
     mut gene_command_queue: ResMut<GeneCommandQueue>,
     mut damage_event_writer: EventWriter<DamageEvent>,
     mut block_event_writer: EventWriter<BlockEvent>,
-    mut pause_unpause_event_writer: EventWriter<PauseUnpauseEvent>,
     mut gene_processing_event_writer: EventWriter<GeneProcessingEvent>,
     mut status_effect_event_writer: EventWriter<StatusEffectEvent>,
     mut log_state: ResMut<LogState>,
@@ -326,7 +382,25 @@ fn handle_gene_commands_system(
         &mut next_state,
         NucleotideState::EndOfTurn,
     );
-    pause_unpause_event_writer.send(PauseUnpauseEvent);
+}
+
+fn handle_ran_away_system(
+    mut ran_away_event_reader: EventReader<RanAwayEvent>,
+    character_type_to_entity_map: Res<CharacterTypeToEntity>,
+    current_state: Res<State<NucleotideState>>,
+    mut next_state: ResMut<NextState<NucleotideState>>,
+    mut battle_reward_ui_state: ResMut<SelectBattleRewardUIState>,
+) {
+    for entity in ran_away_event_reader.iter() {
+        if character_type_to_entity_map.is_player(entity.0) {
+            *battle_reward_ui_state = SelectBattleRewardUIState::after_running_away();
+            force_next_state(
+                current_state.0,
+                &mut next_state,
+                NucleotideState::SelectBattleReward,
+            );
+        }
+    }
 }
 
 fn handle_damage_system(
@@ -335,6 +409,7 @@ fn handle_damage_system(
     character_type_to_entity: Res<CharacterTypeToEntity>,
     current_state: Res<State<NucleotideState>>,
     mut next_state: ResMut<NextState<NucleotideState>>,
+    mut battle_reward_ui_state: ResMut<SelectBattleRewardUIState>,
 ) {
     for damage_event in damage_event_reader.iter() {
         if let Ok((entity, mut health, mut block)) = query.get_mut(damage_event.0) {
@@ -349,13 +424,17 @@ fn handle_damage_system(
                         &mut next_state,
                         NucleotideState::GameOver,
                     ),
-                    CharacterType::Enemy(_) => force_next_state(
-                        // TODO: This doesn't handle multiple enemies at all -- if one dies, battle
-                        // over
-                        current_state.0,
-                        &mut next_state,
-                        NucleotideState::SelectBattleReward,
-                    ),
+                    CharacterType::Enemy(_) => {
+                        *battle_reward_ui_state =
+                            SelectBattleRewardUIState::after_defeating_enemy();
+                        force_next_state(
+                            // TODO: This doesn't handle multiple enemies at all -- if one dies, battle
+                            // over
+                            current_state.0,
+                            &mut next_state,
+                            NucleotideState::SelectBattleReward,
+                        );
+                    }
                 }
             }
         }
@@ -402,12 +481,16 @@ fn apply_status_effect_system(
 }
 
 fn handle_end_of_turn_statuses_system(
+    character_acting: Res<CharacterActing>,
     query: Query<(Entity, &mut StatusEffectComponent, &mut GenomeComponent)>,
+    ran_away_event_writer: EventWriter<RanAwayEvent>,
     damage_event_writer: EventWriter<DamageEvent>,
     mut log: ResMut<LogState>,
 ) {
     handle_statuses(
+        character_acting,
         query,
+        ran_away_event_writer,
         damage_event_writer,
         ActivationTiming::EndOfTurn,
         &mut log,
@@ -416,13 +499,15 @@ fn handle_end_of_turn_statuses_system(
 
 fn finished_handling_gene_system(
     character_acting: ResMut<CharacterActing>,
-    mut query: Query<&mut GenomeComponent>,
+    mut query: Query<(&mut GenomeComponent, &StatusEffectComponent)>,
     mut next_state: ResMut<NextState<NucleotideState>>,
     current_state: Res<State<NucleotideState>>,
 ) {
-    let mut genome = query.get_mut(character_acting.0).unwrap();
+    let (mut genome, status_effects) = query.get_mut(character_acting.0).unwrap();
 
-    genome.advance_pointer();
+    if !status_effects.contains(&StatusEffect::RunningAway) {
+        genome.advance_pointer();
+    }
 
     queue_next_state_if_not_already_queued(
         current_state.0,
@@ -748,7 +833,9 @@ fn get_targets(
 }
 
 fn handle_statuses(
+    character_acting: Res<CharacterActing>,
     mut query: Query<(Entity, &mut StatusEffectComponent, &mut GenomeComponent)>,
+    mut ran_away_event_writer: EventWriter<RanAwayEvent>,
     mut damage_event_writer: EventWriter<DamageEvent>,
     activation_timing: ActivationTiming,
     mut log: &mut ResMut<LogState>,
@@ -757,10 +844,19 @@ fn handle_statuses(
         status_effect
             .0
             .retain_mut(|(status_effect_type, n_stacks)| {
+                if character_acting.0 != entity {
+                    return true;
+                }
                 if status_effect_type.get_activation_timing() != activation_timing {
                     return true;
                 }
                 match status_effect_type {
+                    StatusEffect::RunningAway => {
+                        *n_stacks -= 1;
+                        if n_stacks == &mut 0 {
+                            ran_away_event_writer.send(RanAwayEvent(entity))
+                        }
+                    }
                     StatusEffect::Poison => {
                         log_and_send(
                             &mut log,

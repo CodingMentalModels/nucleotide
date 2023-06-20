@@ -142,8 +142,34 @@ impl GeneUIState {
 pub struct PausedUIState;
 
 #[derive(Debug, Default, Clone, PartialEq, Eq, Hash, Resource)]
-pub struct SelectBattleRewardUIState;
+pub struct SelectBattleRewardUIState(pub Vec<(String, NucleotideState)>);
 
+impl SelectBattleRewardUIState {
+    pub fn after_defeating_enemy() -> Self {
+        Self::all_options()
+    }
+
+    pub fn after_running_away() -> Self {
+        let mut to_return = Self::all_options();
+        to_return.0.remove(0);
+        return to_return;
+    }
+
+    fn all_options() -> Self {
+        Self(vec![
+            (
+                "Choose new Gene from Enemy".to_string(),
+                NucleotideState::SelectGeneFromEnemy,
+            ),
+            ("Move a Gene".to_string(), NucleotideState::MoveGene),
+            ("Swap two Genes".to_string(), NucleotideState::SwapGenes),
+            (
+                "Research a Gene".to_string(),
+                NucleotideState::InitializingBattle,
+            ),
+        ])
+    }
+}
 #[derive(Debug, Default, Clone, PartialEq, Eq, Hash, Resource)]
 pub struct SelectGeneFromEnemyUIState;
 

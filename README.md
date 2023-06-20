@@ -160,6 +160,32 @@ After each fight, we have the option of:
     -> On click, show the hovertext for it
     -> Allow user to click through to continue
 
+### Map
+
+As the game progresses, you progress through several (3?) floors of a building, e.g.
+- Penthouse Lab
+- Lobby
+- Basement
+
+The goal is to escape from the building, via the basement.  Each floor has a (procedurally generated?) plan.
+
+Between fights, you choose a new room to enter which could have:
+- The exit stairs
+- An event -- npcs, stores, etc.
+- A fight
+
+After N rooms traversed, the swat team arrives and recaptures you if you haven't exited yet.
+
+#### Rendering
+
+- Blueprint
+- Grayed out where you haven't been
+- Glowing where you can go
+- Indicator where you are
+- Number of rooms left before the swat arrives
+
+
+As a v0, implement via colored rectangles
 
 ## Enemies
 

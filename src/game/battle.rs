@@ -216,11 +216,15 @@ fn character_acting_system(
 }
 
 fn fetch_battle_actions_system(
+    character_acting: Res<CharacterActing>,
+    character_type_to_entity_map: Res<CharacterTypeToEntity>,
     status_query: Query<(&StatusEffectComponent, With<PlayerComponent>)>,
     mut battle_actions: ResMut<BattleActions>,
 ) {
+    let not_players_turn = !character_type_to_entity_map.is_player(character_acting.0);
     let is_running = status_query.single().0.contains(&StatusEffect::RunningAway);
-    if is_running {
+
+    if not_players_turn || is_running {
         battle_actions.0 = vec![BattleActionEvent::Continue];
     } else {
         battle_actions.0 = vec![BattleActionEvent::Continue, BattleActionEvent::RunAway];
@@ -252,6 +256,7 @@ fn handle_battle_actions_system(
 }
 
 fn handle_start_of_turn_statuses_system(
+    character_acting: Res<CharacterActing>,
     query: Query<(Entity, &mut StatusEffectComponent, &mut GenomeComponent)>,
     ran_away_event_writer: EventWriter<RanAwayEvent>,
     damage_event_writer: EventWriter<DamageEvent>,
@@ -260,6 +265,7 @@ fn handle_start_of_turn_statuses_system(
     mut log_state: ResMut<LogState>,
 ) {
     handle_statuses(
+        character_acting,
         query,
         ran_away_event_writer,
         damage_event_writer,
@@ -286,35 +292,39 @@ fn gene_loading_system(
 ) {
     let (acting_entity, genome, status_effects) = query.get_mut(character_acting.0).unwrap();
 
-    let gene = genome.get_active_gene();
+    if status_effects.contains(&StatusEffect::RunningAway) {
+        log.log_string("Trying to run away.".to_string());
+    } else {
+        let gene = genome.get_active_gene();
 
-    log.log_string(format!("Expressing {}.", gene));
-    let gene_spec = gene_specs
-        .0
-        .get_spec_from_name(&gene)
-        .expect("Gene should exist as a gene spec.");
-    let targets = get_targets(
-        acting_entity,
-        character_type_to_entity_map,
-        gene_spec.get_target(),
-    );
+        log.log_string(format!("Expressing {}.", gene));
+        let gene_spec = gene_specs
+            .0
+            .get_spec_from_name(&gene)
+            .expect("Gene should exist as a gene spec.");
+        let targets = get_targets(
+            acting_entity,
+            character_type_to_entity_map,
+            gene_spec.get_target(),
+        );
 
-    gene_command_queue.0.append(
-        &mut gene_spec
-            .get_gene_commands()
-            .iter()
-            .filter(|gene_command| match gene_command {
-                GeneCommand::Damage(_) => !status_effects.contains(&StatusEffect::Constricted),
-                _ => true,
-            })
-            .map(|gene_command| {
-                targets
-                    .iter()
-                    .map(|target| (gene_command.clone(), target.clone()))
-            })
-            .flatten()
-            .collect(),
-    );
+        gene_command_queue.0.append(
+            &mut gene_spec
+                .get_gene_commands()
+                .iter()
+                .filter(|gene_command| match gene_command {
+                    GeneCommand::Damage(_) => !status_effects.contains(&StatusEffect::Constricted),
+                    _ => true,
+                })
+                .map(|gene_command| {
+                    targets
+                        .iter()
+                        .map(|target| (gene_command.clone(), target.clone()))
+                })
+                .flatten()
+                .collect(),
+        );
+    }
 
     queue_next_state_if_not_already_queued(
         current_state.0,
@@ -471,12 +481,14 @@ fn apply_status_effect_system(
 }
 
 fn handle_end_of_turn_statuses_system(
+    character_acting: Res<CharacterActing>,
     query: Query<(Entity, &mut StatusEffectComponent, &mut GenomeComponent)>,
     ran_away_event_writer: EventWriter<RanAwayEvent>,
     damage_event_writer: EventWriter<DamageEvent>,
     mut log: ResMut<LogState>,
 ) {
     handle_statuses(
+        character_acting,
         query,
         ran_away_event_writer,
         damage_event_writer,
@@ -487,13 +499,15 @@ fn handle_end_of_turn_statuses_system(
 
 fn finished_handling_gene_system(
     character_acting: ResMut<CharacterActing>,
-    mut query: Query<&mut GenomeComponent>,
+    mut query: Query<(&mut GenomeComponent, &StatusEffectComponent)>,
     mut next_state: ResMut<NextState<NucleotideState>>,
     current_state: Res<State<NucleotideState>>,
 ) {
-    let mut genome = query.get_mut(character_acting.0).unwrap();
+    let (mut genome, status_effects) = query.get_mut(character_acting.0).unwrap();
 
-    genome.advance_pointer();
+    if !status_effects.contains(&StatusEffect::RunningAway) {
+        genome.advance_pointer();
+    }
 
     queue_next_state_if_not_already_queued(
         current_state.0,
@@ -819,6 +833,7 @@ fn get_targets(
 }
 
 fn handle_statuses(
+    character_acting: Res<CharacterActing>,
     mut query: Query<(Entity, &mut StatusEffectComponent, &mut GenomeComponent)>,
     mut ran_away_event_writer: EventWriter<RanAwayEvent>,
     mut damage_event_writer: EventWriter<DamageEvent>,
@@ -829,6 +844,9 @@ fn handle_statuses(
         status_effect
             .0
             .retain_mut(|(status_effect_type, n_stacks)| {
+                if character_acting.0 != entity {
+                    return true;
+                }
                 if status_effect_type.get_activation_timing() != activation_timing {
                     return true;
                 }

@@ -3,6 +3,7 @@ mod game;
 use bevy::prelude::*;
 use game::assets::AssetsPlugin;
 use game::input::InputPlugin;
+use game::map::MapPlugin;
 use game::meta::MetaPlugin;
 use game::pause::PausePlugin;
 
@@ -19,6 +20,7 @@ fn main() {
         .add_plugin(InputPlugin)
         .add_plugin(BattlePlugin)
         .add_plugin(MetaPlugin)
+        .add_plugin(MapPlugin)
         .add_plugin(PausePlugin)
         .run();
 }

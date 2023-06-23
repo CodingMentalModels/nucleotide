@@ -7,6 +7,7 @@ use crate::game::specs::GeneCommand;
 
 use super::{
     events::BattleActionEvent,
+    map::Map,
     specs::{EnemyName, EnemySpec, GeneName, GeneSpec},
 };
 
@@ -98,6 +99,15 @@ impl Player {
         assert!(i < self.genome.len() && j <= self.genome.len());
         let gene_i = self.genome.remove(i);
         self.genome.insert(j, gene_i);
+    }
+}
+
+#[derive(Debug, Clone, Resource)]
+pub struct MapState(Map);
+
+impl Default for MapState {
+    fn default() -> Self {
+        Self(Map::empty())
     }
 }
 

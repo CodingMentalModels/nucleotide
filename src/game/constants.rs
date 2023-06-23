@@ -16,6 +16,9 @@ pub const LOG_WINDOW_SIZE: (f32, f32) = (300.0, 300.0);
 pub const LOG_TEXT_SIZE: f32 = 20.;
 pub const MAX_ACTION_BUTTONS: usize = 4;
 
+// Map
+pub const MAP_ROOM_SIZE: (f32, f32) = (700., 400.);
+
 // Greek Letters
 pub const ALPHA_LOWER: char = 'α';
 pub const ALPHA_UPPER: char = 'Α';

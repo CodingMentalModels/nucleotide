@@ -210,7 +210,12 @@ There's a global vs. local tradeoff here:
 Algorithm:
 1. Construct floor plan
     1. Do N iterations of pick a point and an orientation (up/down or left/right) and build a wall until it hits something
-    2. Add doors to most walls
+    2. Derive the rectangles from the walls
+        1. Observation: As each line segment is created, it turns exactly one rectangle into two rectangles
+    3. Mark adjacent rooms as adjacent in the AdjacencyGraph
+        1. Observation: At the intersection points of the line segment with walls are up to two other adjacencies (usually 1)
+        2. Observation: If we check the intersection points in (1) in reverse order that they're applied, we're guaranteed to visit each possible adjacency at least once
+    4. Remove some adjacencies for interest
 2. Define rooms (or regenerate if it's not possible)
 3. (Potentially, generate several instances and evaluate which one is best based on some criteria)
 4. Render

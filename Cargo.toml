@@ -12,6 +12,7 @@ egui = "0.21.0"
 rand = "0.8.5"
 serde = "1.0.159"
 serde_json = "1.0.95"
+petgraph = "0.6.3"
 
 # Enable a small amount of optimization in debug mode
 [profile.dev]

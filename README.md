@@ -179,6 +179,41 @@ After N rooms traversed, the swat team arrives and recaptures you if you haven't
 #### Modelling
 
 - Will need a graph representation to know which rooms are adjacent to other ones
+    - # of rooms total
+    - # of each type of room
+        - Entrance
+        - Exit
+        - Battles
+        - Events
+        - Stores
+        - Leftover rooms are empty
+    - Minimum distances?  Probably not
+- Will need a cartesian representation to know how to render
+    - Where each wall, door, etc. is
+    - Which rooms are which
+    - Should look like a floor plan
+        - It should have walls, doors
+        - Walls should typically be straight or at right angles
+        - Doors should be in reasonable locations and there shouldn't be redundancies
+        - Graph should bias towards completeness rather than sparseness
+
+Which to start with to generate the other one?
+Which has more constraints?  Probably the cartesian representation.
+
+Key question: Given an adjacency graph, can I subdivide a rectangle to achieve that graph?
+- In general, no.  It takes a 3d space to embed a graph.
+
+There's a global vs. local tradeoff here:
+- Globally, we want to satisfy some adjacency graph
+- Locally, we want things to look like a building plan and not like a random cave
+
+Algorithm:
+1. Construct floor plan
+    1. Do N iterations of pick a point and an orientation (up/down or left/right) and build a wall until it hits something
+    2. Add doors to most walls
+2. Define rooms (or regenerate if it's not possible)
+3. (Potentially, generate several instances and evaluate which one is best based on some criteria)
+4. Render
 
 #### Rendering
 

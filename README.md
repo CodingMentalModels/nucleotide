@@ -176,6 +176,10 @@ Between fights, you choose a new room to enter which could have:
 
 After N rooms traversed, the swat team arrives and recaptures you if you haven't exited yet.
 
+#### Modelling
+
+- Will need a graph representation to know which rooms are adjacent to other ones
+
 #### Rendering
 
 - Blueprint

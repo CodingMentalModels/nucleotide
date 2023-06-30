@@ -44,7 +44,8 @@ fn update_map_system(mut commands: Commands, map_state: Res<MapState>) {
                     custom_size: Some(rect.size()),
                     ..default()
                 },
-                transform: Transform::from_translation(rect.min.extend(0.)),
+                transform: Transform::from_translation(rect.center().extend(0.))
+                    .with_scale(0.95 * Vec3::ONE),
                 ..default()
             })
             .id();
@@ -169,10 +170,11 @@ impl RoomBinaryTreeNode {
     pub fn generate_adjacency_graph(&self) -> AdjacencyGraph {
         let mut to_return = InternalGraph::new_undirected();
         let nodes: Vec<_> = self
-            .get_rooms()
+            .get_leaf_rooms()
             .into_iter()
             .map(|node| to_return.add_node(node))
             .collect();
+        assert_eq!(nodes.len(), N_ROOMS_PER_FLOOR);
         // TODO: Generate the edges
         return AdjacencyGraph::new(to_return);
     }
@@ -225,6 +227,18 @@ impl RoomBinaryTreeNode {
             (None, None) => 0,
             _ => 1,
         }
+    }
+
+    pub fn get_leaf_rooms(&self) -> Vec<Room> {
+        match self.get_children() {
+            Some((left_children, right_children)) => {
+                let mut to_return = vec![];
+                to_return.append(&mut left_children.get_leaf_rooms());
+                to_return.append(&mut right_children.get_leaf_rooms());
+                return to_return;
+            }
+            None => return vec![self.room],
+        };
     }
 
     pub fn get_rooms(&self) -> Vec<Room> {
@@ -320,22 +334,47 @@ impl Room {
     }
 }
 
-#[derive(Debug, Copy, Clone, PartialEq, Eq, Hash)]
-pub enum WallSegment {
-    Vertical(XCoordinate, (YCoordinate, YCoordinate)),
-    Horizontal((XCoordinate, XCoordinate), YCoordinate),
-}
-
-impl WallSegment {}
-
-#[derive(Debug, Copy, Clone, PartialEq, Eq, Hash)]
-pub enum MapTile {
-    Floor,
-    Wall,
-}
-
 // End Helper Structs
 
 //Helper Functions
 
 //End Helper Functions
+
+#[cfg(test)]
+mod tests {
+    use rand::rngs::mock::StepRng;
+
+    use super::*;
+
+    #[test]
+    fn test_room_split() {
+        let room = Room::new(Rect::from_corners(Vec2::new(1.0, 2.0), Vec2::new(3.0, 5.0)));
+        let (left, right) = room.split(Vec2::new(1.5, 3.0), true);
+        assert!(left.min().distance(room.min()) <= 0.001);
+        assert!(right.max().distance(room.max()) <= 0.001);
+
+        assert!(left.max().distance(Vec2::new(1.5, 5.0)) <= 0.001);
+        assert!(right.min().distance(Vec2::new(1.5, 2.0)) <= 0.001);
+
+        let (bottom, top) = room.split(Vec2::new(1.5, 3.0), false);
+        assert!(bottom.min().distance(room.min()) <= 0.001);
+        assert!(top.max().distance(room.max()) <= 0.001);
+
+        assert!(bottom.max().distance(Vec2::new(3.0, 3.0)) <= 0.001);
+        assert!(top.min().distance(Vec2::new(1.0, 3.0)) <= 0.001);
+    }
+
+    #[test]
+    fn test_random_point() {
+        let room = Room::new(Rect::from_corners(Vec2::new(1.0, 2.0), Vec2::new(3.0, 4.0)));
+        let mut rng = rand::thread_rng();
+
+        for _ in 0..100 {
+            let point = room.random_point(&mut rng);
+            assert!(point.x >= room.min().x);
+            assert!(point.x <= room.max().x);
+            assert!(point.y >= room.min().y);
+            assert!(point.y <= room.max().y);
+        }
+    }
+}

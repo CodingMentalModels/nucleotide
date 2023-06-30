@@ -17,7 +17,10 @@ pub const LOG_TEXT_SIZE: f32 = 20.;
 pub const MAX_ACTION_BUTTONS: usize = 4;
 
 // Map
-pub const MAP_ROOM_SIZE: (f32, f32) = (700., 400.);
+pub const MAP_FLOOR_SIZE: (f32, f32) = (700., 400.);
+pub const N_ROOMS_PER_FLOOR: usize = 20;
+pub const MIN_ROOM_SIZE: f32 = 80.;
+pub const MAP_WALLS_VERTICAL_PROPORTION: f64 = 0.5;
 
 // Greek Letters
 pub const ALPHA_LOWER: char = 'α';

@@ -178,7 +178,7 @@ After N rooms traversed, the swat team arrives and recaptures you if you haven't
 
 #### Modelling
 
-- Will need a graph representation to know which rooms are adjacent to other ones
+- Will need a graph (network) representation to know which rooms are adjacent to other ones
     - # of rooms total
     - # of each type of room
         - Entrance

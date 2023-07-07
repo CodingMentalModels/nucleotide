@@ -36,20 +36,16 @@ fn generate_map_system(mut commands: Commands) {
 fn update_map_system(mut commands: Commands, map_state: Res<MapState>) {
     let rects = map_state.0.get_rects();
     let mut map_sprites = Vec::new();
+    let to_center_x = -MAP_FLOOR_SIZE.0 / 2.;
+    let to_center_y = -MAP_FLOOR_SIZE.1 / 2.;
     for rect in rects {
-        let entity = commands
-            .spawn(SpriteBundle {
-                sprite: Sprite {
-                    color: Color::rgb(0.25, 0.25, 0.75),
-                    custom_size: Some(rect.size()),
-                    ..default()
-                },
-                transform: Transform::from_translation(rect.center().extend(0.))
-                    .with_scale(0.95 * Vec3::ONE),
-                ..default()
-            })
-            .id();
-        map_sprites.push(entity);
+        let (front_rect, back_rect) = get_front_and_back_room_sprites(
+            &mut commands,
+            rect,
+            Vec2::new(to_center_x, to_center_y),
+        );
+        map_sprites.push(front_rect);
+        map_sprites.push(back_rect);
     }
 
     commands.insert_resource(MapSprites(map_sprites));
@@ -392,6 +388,45 @@ pub enum MapGenerationError {
 
 //Helper Functions
 
+fn get_front_and_back_room_sprites(
+    commands: &mut Commands,
+    rect: Rect,
+    global_translation: Vec2,
+) -> (Entity, Entity) {
+    let blueprint_blue = Color::rgb(BLUEPRINT_BLUE.0, BLUEPRINT_BLUE.1, BLUEPRINT_BLUE.2);
+    let back_sprite = commands
+        .spawn(SpriteBundle {
+            sprite: Sprite {
+                color: Color::WHITE,
+                custom_size: Some(rect.size()),
+                ..default()
+            },
+            transform: Transform::from_translation(
+                rect.center().extend(0.) + global_translation.extend(0.),
+            ),
+            ..default()
+        })
+        .id();
+    let front_rect = Rect::from_corners(
+        rect.min + WALL_WIDTH * Vec2::ONE,
+        rect.max - WALL_WIDTH * Vec2::ONE,
+    );
+    let front_sprite = commands
+        .spawn(SpriteBundle {
+            sprite: Sprite {
+                color: blueprint_blue,
+                custom_size: Some(front_rect.size()),
+                ..default()
+            },
+            transform: Transform::from_translation(
+                rect.center().extend(1.) + global_translation.extend(0.),
+            ),
+            ..default()
+        })
+        .id();
+
+    return (front_sprite, back_sprite);
+}
 //End Helper Functions
 
 #[cfg(test)]

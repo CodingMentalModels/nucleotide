@@ -79,7 +79,7 @@ impl MapState {
     }
 }
 
-#[derive(Debug, Clone, Resource)]
+#[derive(Debug, Copy, Clone, Resource)]
 pub struct MapGenerationConfig {
     n_rooms: usize,
     min_room_size: f32,
@@ -143,7 +143,20 @@ impl Map {
             Vec2::ZERO,
             Vec2::new(MAP_FLOOR_SIZE.0, MAP_FLOOR_SIZE.1),
         ));
-        return RoomBinaryTreeNode::generate(&mut rng, config, room);
+
+        let mut errors = Vec::new();
+        for _i in 0..MAX_MAP_GENERATION_ITERATIONS {
+            match RoomBinaryTreeNode::generate(&mut rng, config, room) {
+                Ok(m) => return m,
+                Err(e) => {
+                    errors.push(format!("{:?}", e));
+                }
+            }
+        }
+        panic!(
+            "Exceeded max map generation iterations:\n{}",
+            errors.join("\n")
+        );
     }
 }
 
@@ -156,7 +169,7 @@ pub struct RoomBinaryTreeNode {
 
 impl From<Rect> for RoomBinaryTreeNode {
     fn from(value: Rect) -> Self {
-        Self::from(value)
+        Self::from(Room::new(value))
     }
 }
 
@@ -179,26 +192,35 @@ impl RoomBinaryTreeNode {
         return AdjacencyGraph::new(to_return);
     }
 
-    pub fn generate(rng: &mut ThreadRng, config: MapGenerationConfig, room: Room) -> Self {
+    pub fn generate(
+        rng: &mut ThreadRng,
+        config: MapGenerationConfig,
+        room: Room,
+    ) -> Result<Self, MapGenerationError> {
         match config.split() {
             None => {
-                return Self::from(room);
+                return Ok(Self::from(room));
             }
             Some((left_config, right_config)) => {
-                let (left_room, right_room) = Self::split(room, rng, config);
+                let (left_room, right_room) = Self::split(room, rng, config)?;
 
-                let left = Self::generate(rng, left_config, left_room);
-                let right = Self::generate(rng, right_config, right_room);
-                return Self::new(left, right, room);
+                let left = Self::generate(rng, left_config, left_room)?;
+                let right = Self::generate(rng, right_config, right_room)?;
+                return Ok(Self::new(left, right, room));
             }
         };
     }
 
-    pub fn split(room: Room, rng: &mut ThreadRng, config: MapGenerationConfig) -> (Room, Room) {
-        let point = room.random_point(rng);
-        let is_vertical: bool = rng.gen_bool(MAP_WALLS_VERTICAL_PROPORTION);
+    pub fn split(
+        room: Room,
+        rng: &mut ThreadRng,
+        config: MapGenerationConfig,
+    ) -> Result<(Room, Room), MapGenerationError> {
+        let point =
+            room.random_point_constrained(rng, (config.min_room_size, config.min_room_size))?;
+        let is_vertical: bool = room.height() < room.width();
 
-        room.split(point, is_vertical)
+        Ok(room.split(point, is_vertical))
     }
 
     pub fn new(left: Self, right: Self, room: Room) -> Self {
@@ -304,6 +326,25 @@ impl Room {
     pub fn new(rect: Rect) -> Self {
         Self { rect }
     }
+
+    pub fn random_point_constrained(
+        &self,
+        rng: &mut ThreadRng,
+        min_room_size: (f32, f32),
+    ) -> Result<Vec2, MapGenerationError> {
+        let min_room_size_is_overconstrained =
+            (min_room_size.0 > self.width() / 2.0) || min_room_size.1 > self.height() / 2.0;
+        if min_room_size_is_overconstrained {
+            Err(MapGenerationError::RandomPointOverconstrained)
+        } else {
+            let x: f32 =
+                rng.gen_range(self.rect.min.x + min_room_size.0..self.rect.max.x - min_room_size.0);
+            let y: f32 =
+                rng.gen_range(self.rect.min.y + min_room_size.1..self.rect.max.y - min_room_size.1);
+            Ok(Vec2::new(x, y))
+        }
+    }
+
     pub fn random_point(&self, rng: &mut ThreadRng) -> Vec2 {
         let x: f32 = rng.gen_range(self.rect.min.x..self.rect.max.x);
         let y: f32 = rng.gen_range(self.rect.min.y..self.rect.max.y);
@@ -332,6 +373,19 @@ impl Room {
     pub fn max(&self) -> Vec2 {
         self.rect.max
     }
+
+    pub fn width(&self) -> f32 {
+        self.rect.width()
+    }
+
+    pub fn height(&self) -> f32 {
+        self.rect.height()
+    }
+}
+
+#[derive(Debug, Copy, Clone, PartialEq)]
+pub enum MapGenerationError {
+    RandomPointOverconstrained,
 }
 
 // End Helper Structs

@@ -9,7 +9,8 @@ use rand::Rng;
 
 type XCoordinate = u32;
 type YCoordinate = u32;
-type InternalGraph = UnGraph<Room, ()>;
+type DoorPosition = Vec2;
+type InternalGraph = UnGraph<Room, DoorPosition>;
 
 pub struct MapPlugin;
 
@@ -34,11 +35,11 @@ fn generate_map_system(mut commands: Commands) {
 }
 
 fn update_map_system(mut commands: Commands, map_state: Res<MapState>) {
-    let rects = map_state.0.get_rects();
+    let room_rects = map_state.0.get_room_rects();
     let mut map_sprites = Vec::new();
     let to_center_x = -MAP_FLOOR_SIZE.0 / 2.;
     let to_center_y = -MAP_FLOOR_SIZE.1 / 2.;
-    for rect in rects {
+    for rect in room_rects {
         let (front_rect, back_rect) = get_front_and_back_room_sprites(
             &mut commands,
             rect,
@@ -46,6 +47,18 @@ fn update_map_system(mut commands: Commands, map_state: Res<MapState>) {
         );
         map_sprites.push(front_rect);
         map_sprites.push(back_rect);
+    }
+
+    let door_rects = map_state.0.get_door_rects();
+    for rect in door_rects {
+        let door_sprite = get_rect_sprite(
+            &mut commands,
+            rect,
+            1.0,
+            Vec2::new(to_center_x, to_center_y),
+            Color::WHITE,
+        );
+        map_sprites.push(door_sprite);
     }
 
     commands.insert_resource(MapSprites(map_sprites));
@@ -128,8 +141,12 @@ impl Map {
         Map::new(graph)
     }
 
-    pub fn get_rects(&self) -> Vec<Rect> {
-        self.adjacency_graph.get_rects()
+    pub fn get_room_rects(&self) -> Vec<Rect> {
+        self.adjacency_graph.get_room_rects()
+    }
+
+    pub fn get_door_rects(&self) -> Vec<Rect> {
+        self.adjacency_graph.get_door_rects()
     }
 
     fn generate_room_tree(config: MapGenerationConfig) -> RoomBinaryTreeNode {
@@ -178,13 +195,23 @@ impl From<Room> for RoomBinaryTreeNode {
 impl RoomBinaryTreeNode {
     pub fn generate_adjacency_graph(&self) -> AdjacencyGraph {
         let mut to_return = InternalGraph::new_undirected();
-        let nodes: Vec<_> = self
+        let mut nodes_to_rooms: Vec<_> = self
             .get_leaf_rooms()
             .into_iter()
-            .map(|node| to_return.add_node(node))
+            .map(|room| (to_return.add_node(room), room))
             .collect();
-        assert_eq!(nodes.len(), N_ROOMS_PER_FLOOR);
-        // TODO: Generate the edges
+        assert_eq!(nodes_to_rooms.len(), N_ROOMS_PER_FLOOR);
+
+        while let Some((l_node, l_room)) = nodes_to_rooms.pop() {
+            for (r_node, r_room) in nodes_to_rooms.iter() {
+                match Room::get_potential_door_position(l_room, r_room.clone()) {
+                    None => {}
+                    Some(position) => {
+                        to_return.update_edge(l_node, *r_node, position);
+                    }
+                }
+            }
+        }
         return AdjacencyGraph::new(to_return);
     }
 
@@ -293,13 +320,26 @@ impl AdjacencyGraph {
         Self(graph)
     }
 
-    pub fn get_rects(&self) -> Vec<Rect> {
+    pub fn get_room_rects(&self) -> Vec<Rect> {
         self.0
             .clone()
             .into_nodes_edges()
             .0
             .into_iter()
             .map(|node| node.weight.rect)
+            .collect()
+    }
+
+    pub fn get_door_rects(&self) -> Vec<Rect> {
+        let door_size = Vec2::new(DOOR_SIZE.0, DOOR_SIZE.1);
+        self.0
+            .clone()
+            .into_nodes_edges()
+            .1
+            .into_iter()
+            .map(|edge| {
+                Rect::from_corners(edge.weight - door_size / 2., edge.weight + door_size / 2.)
+            })
             .collect()
     }
 }
@@ -321,6 +361,41 @@ impl Default for Room {
 impl Room {
     pub fn new(rect: Rect) -> Self {
         Self { rect }
+    }
+
+    pub fn get_potential_door_position(l_room: Self, r_room: Self) -> Option<DoorPosition> {
+        let overlap_tolerance = 1.1;
+        let delta = WALL_WIDTH * overlap_tolerance;
+
+        let l_rect = l_room.rect;
+        let r_rect = r_room.rect;
+
+        Self::get_potential_door_position_from_shift(l_rect, r_rect, delta * Vec2::X)
+            .or(Self::get_potential_door_position_from_shift(
+                l_rect,
+                r_rect,
+                delta * Vec2::NEG_X,
+            ))
+            .or(Self::get_potential_door_position_from_shift(
+                l_rect,
+                r_rect,
+                delta * Vec2::Y,
+            ))
+            .or(Self::get_potential_door_position_from_shift(
+                l_rect,
+                r_rect,
+                delta * Vec2::NEG_Y,
+            ))
+    }
+
+    fn get_potential_door_position_from_shift(
+        l_rect: Rect,
+        r_rect: Rect,
+        shift: Vec2,
+    ) -> Option<DoorPosition> {
+        let l_shifted = shift_rect(l_rect, shift);
+        let r_shifted = shift_rect(r_rect, -shift);
+        get_potential_rect_intersection_center(l_shifted, r_shifted)
     }
 
     pub fn random_point_constrained(
@@ -387,6 +462,18 @@ pub enum MapGenerationError {
 // End Helper Structs
 
 //Helper Functions
+fn shift_rect(rect: Rect, delta: Vec2) -> Rect {
+    Rect::from_corners(rect.min + delta, rect.max + delta)
+}
+
+fn get_potential_rect_intersection_center(l_rect: Rect, r_rect: Rect) -> Option<Vec2> {
+    let overlap = l_rect.intersect(r_rect);
+    if overlap.is_empty() {
+        return None;
+    } else {
+        Some(overlap.center())
+    }
+}
 
 fn get_front_and_back_room_sprites(
     commands: &mut Commands,
@@ -394,38 +481,37 @@ fn get_front_and_back_room_sprites(
     global_translation: Vec2,
 ) -> (Entity, Entity) {
     let blueprint_blue = Color::rgb(BLUEPRINT_BLUE.0, BLUEPRINT_BLUE.1, BLUEPRINT_BLUE.2);
-    let back_sprite = commands
-        .spawn(SpriteBundle {
-            sprite: Sprite {
-                color: Color::WHITE,
-                custom_size: Some(rect.size()),
-                ..default()
-            },
-            transform: Transform::from_translation(
-                rect.center().extend(0.) + global_translation.extend(0.),
-            ),
-            ..default()
-        })
-        .id();
+    let back_sprite = get_rect_sprite(commands, rect, 0., global_translation, Color::WHITE);
     let front_rect = Rect::from_corners(
         rect.min + WALL_WIDTH * Vec2::ONE,
         rect.max - WALL_WIDTH * Vec2::ONE,
     );
-    let front_sprite = commands
+    let front_sprite =
+        get_rect_sprite(commands, front_rect, 1., global_translation, blueprint_blue);
+
+    return (front_sprite, back_sprite);
+}
+
+fn get_rect_sprite(
+    commands: &mut Commands,
+    rect: Rect,
+    z_value: f32,
+    global_translation: Vec2,
+    color: Color,
+) -> Entity {
+    commands
         .spawn(SpriteBundle {
             sprite: Sprite {
-                color: blueprint_blue,
-                custom_size: Some(front_rect.size()),
+                color: color,
+                custom_size: Some(rect.size()),
                 ..default()
             },
             transform: Transform::from_translation(
-                rect.center().extend(1.) + global_translation.extend(0.),
+                rect.center().extend(z_value) + global_translation.extend(0.),
             ),
             ..default()
         })
-        .id();
-
-    return (front_sprite, back_sprite);
+        .id()
 }
 //End Helper Functions
 

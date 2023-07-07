@@ -23,6 +23,7 @@ pub const MIN_ROOM_SIZE: f32 = 20.;
 pub const MAP_WALLS_VERTICAL_PROPORTION: f64 = 0.5;
 pub const MAX_MAP_GENERATION_ITERATIONS: usize = 100;
 pub const WALL_WIDTH: f32 = 1.;
+pub const DOOR_SIZE: (f32, f32) = (5., 5.);
 
 // Colors
 pub const BLUEPRINT_BLUE: (f32, f32, f32) = (0.25, 0.25, 0.75);

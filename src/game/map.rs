@@ -239,9 +239,9 @@ impl RoomBinaryTreeNode {
         rng: &mut ThreadRng,
         config: MapGenerationConfig,
     ) -> Result<(Room, Room), MapGenerationError> {
+        let is_vertical: bool = room.height() < room.width();
         let point =
             room.random_point_constrained(rng, (config.min_room_size, config.min_room_size))?;
-        let is_vertical: bool = room.height() < room.width();
 
         Ok(room.split(point, is_vertical))
     }
@@ -404,14 +404,22 @@ impl Room {
         min_room_size: (f32, f32),
     ) -> Result<Vec2, MapGenerationError> {
         let min_room_size_is_overconstrained =
-            (min_room_size.0 > self.width() / 2.0) || min_room_size.1 > self.height() / 2.0;
+            (2.0 * min_room_size.0 > self.width()) || (2.0 * min_room_size.1 > self.height());
         if min_room_size_is_overconstrained {
             Err(MapGenerationError::RandomPointOverconstrained)
         } else {
-            let x: f32 =
-                rng.gen_range(self.rect.min.x + min_room_size.0..self.rect.max.x - min_room_size.0);
-            let y: f32 =
-                rng.gen_range(self.rect.min.y + min_room_size.1..self.rect.max.y - min_room_size.1);
+            let min_x = self.rect.min.x + min_room_size.0;
+            let min_y = self.rect.min.y + min_room_size.1;
+
+            let max_x = self.rect.max.x - min_room_size.0;
+            let max_y = self.rect.max.y - min_room_size.1;
+
+            let delta_x: f32 = rng.gen_range(0.0..=max_x - min_x);
+            let delta_y: f32 = rng.gen_range(0.0..=max_y - min_y);
+
+            let x = min_x + round_to_nearest(delta_x, min_room_size.0);
+            let y = min_y + round_to_nearest(delta_y, min_room_size.1);
+
             Ok(Vec2::new(x, y))
         }
     }
@@ -512,6 +520,10 @@ fn get_rect_sprite(
             ..default()
         })
         .id()
+}
+
+fn round_to_nearest(f: f32, nearest: f32) -> f32 {
+    (f / nearest).round() * nearest
 }
 //End Helper Functions
 

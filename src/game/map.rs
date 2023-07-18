@@ -3,6 +3,7 @@ use std::collections::HashMap;
 use crate::game::constants::*;
 use crate::game::resources::*;
 use bevy::prelude::*;
+use petgraph::algo::connected_components;
 use petgraph::graph::UnGraph;
 use rand::rngs::ThreadRng;
 use rand::Rng;
@@ -212,6 +213,8 @@ impl RoomBinaryTreeNode {
                 }
             }
         }
+
+        assert_eq!(connected_components(&to_return), 1);
         return AdjacencyGraph::new(to_return);
     }
 
@@ -364,8 +367,7 @@ impl Room {
     }
 
     pub fn get_potential_door_position(l_room: Self, r_room: Self) -> Option<DoorPosition> {
-        let overlap_tolerance = 1.1;
-        let delta = WALL_WIDTH * overlap_tolerance;
+        let delta = 3.0 * WALL_WIDTH;
 
         let l_rect = l_room.rect;
         let r_rect = r_room.rect;

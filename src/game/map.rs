@@ -55,7 +55,7 @@ fn update_map_system(mut commands: Commands, map_state: Res<MapState>) {
         let door_sprite = get_rect_sprite(
             &mut commands,
             rect,
-            1.0,
+            2.0,
             Vec2::new(to_center_x, to_center_y),
             Color::WHITE,
         );
@@ -203,8 +203,10 @@ impl RoomBinaryTreeNode {
             .collect();
         assert_eq!(nodes_to_rooms.len(), N_ROOMS_PER_FLOOR);
 
+        let mut n_visited = 0;
         while let Some((l_node, l_room)) = nodes_to_rooms.pop() {
             for (r_node, r_room) in nodes_to_rooms.iter() {
+                n_visited += 1;
                 match Room::get_potential_door_position(l_room, r_room.clone()) {
                     None => {}
                     Some(position) => {
@@ -214,7 +216,14 @@ impl RoomBinaryTreeNode {
             }
         }
 
+        assert_eq!(
+            n_visited,
+            ((N_ROOMS_PER_FLOOR) * (N_ROOMS_PER_FLOOR - 1)) / 2
+        );
+
         assert_eq!(connected_components(&to_return), 1);
+
+        println!("n_edges: {}", to_return.edge_count());
         return AdjacencyGraph::new(to_return);
     }
 

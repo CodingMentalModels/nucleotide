@@ -5,6 +5,8 @@ use crate::game::resources::*;
 use bevy::prelude::*;
 use petgraph::algo::connected_components;
 use petgraph::graph::UnGraph;
+use rand::distributions::WeightedIndex;
+use rand::prelude::*;
 use rand::rngs::ThreadRng;
 use rand::Rng;
 
@@ -27,27 +29,38 @@ impl Plugin for MapPlugin {
 
 // Systems
 fn generate_map_system(mut commands: Commands) {
-    let config = MapGenerationConfig {
-        n_rooms: N_ROOMS_PER_FLOOR,
-        min_room_size: MIN_ROOM_SIZE,
-    };
+    let config = MapGenerationConfig::new(
+        N_ROOMS_PER_FLOOR,
+        MIN_ROOM_SIZE,
+        MapGenerationConfig::load_room_type_weights(),
+    );
     commands.insert_resource(MapState::generate_map(config));
     commands.insert_resource(NextState(Some(NucleotideState::SelectingRoom)));
 }
 
-fn update_map_system(mut commands: Commands, map_state: Res<MapState>) {
-    let room_rects = map_state.0.get_room_rects();
+fn update_map_system(mut commands: Commands, font: Res<LoadedFont>, map_state: Res<MapState>) {
+    let rooms = map_state.0.get_rooms();
     let mut map_sprites = Vec::new();
     let to_center_x = -MAP_FLOOR_SIZE.0 / 2.;
     let to_center_y = -MAP_FLOOR_SIZE.1 / 2.;
-    for rect in room_rects {
-        let (front_rect, back_rect) = get_front_and_back_room_sprites(
+    for room in rooms {
+        let rect = room.rect;
+        let room_type = room.room_type;
+
+        let to_center_adjustment = Vec2::new(to_center_x, to_center_y);
+        let (front_rect, back_rect) =
+            get_front_and_back_room_sprites(&mut commands, rect, to_center_adjustment);
+
+        let room_type_sprite = get_rect_sprite(
             &mut commands,
-            rect,
-            Vec2::new(to_center_x, to_center_y),
+            rect.scale(0.2),
+            2.0,
+            to_center_adjustment,
+            room_type.to_color(),
         );
         map_sprites.push(front_rect);
         map_sprites.push(back_rect);
+        map_sprites.push(room_type_sprite);
     }
 
     let door_rects = map_state.0.get_door_rects();
@@ -89,20 +102,34 @@ impl MapState {
     }
 }
 
-#[derive(Debug, Copy, Clone, Resource)]
+#[derive(Debug, Clone, Resource)]
 pub struct MapGenerationConfig {
     n_rooms: usize,
     min_room_size: f32,
+    room_type_weights: HashMap<RoomType, f32>,
 }
 
 impl MapGenerationConfig {
-    pub fn new(n_rooms: usize, min_room_size: f32) -> Self {
+    pub fn new(
+        n_rooms: usize,
+        min_room_size: f32,
+        room_type_weights: HashMap<RoomType, f32>,
+    ) -> Self {
         Self {
             n_rooms,
             min_room_size,
+            room_type_weights,
         }
     }
 
+    pub fn load_room_type_weights() -> HashMap<RoomType, f32> {
+        vec![
+            (RoomType::Empty, EMPTY_ROOM_WEIGHT),
+            (RoomType::Combat, COMBAT_ROOM_WEIGHT),
+        ]
+        .into_iter()
+        .collect()
+    }
     pub fn split(&self) -> Option<(MapGenerationConfig, MapGenerationConfig)> {
         if self.n_rooms <= 1 {
             return None;
@@ -110,8 +137,16 @@ impl MapGenerationConfig {
         let left_n_rooms = self.n_rooms / 2;
         let right_n_rooms = self.n_rooms - self.n_rooms / 2;
         return Some((
-            Self::new(left_n_rooms, self.min_room_size),
-            Self::new(right_n_rooms, self.min_room_size),
+            Self::new(
+                left_n_rooms,
+                self.min_room_size,
+                self.room_type_weights.clone(),
+            ),
+            Self::new(
+                right_n_rooms,
+                self.min_room_size,
+                self.room_type_weights.clone(),
+            ),
         ));
     }
 }
@@ -137,9 +172,15 @@ impl Map {
     }
 
     pub fn generate(config: MapGenerationConfig) -> Self {
-        let tree = Self::generate_room_tree(config);
-        let graph = tree.generate_adjacency_graph();
+        let mut rng = rand::thread_rng();
+
+        let tree = Self::generate_room_tree(config.clone(), &mut rng);
+        let graph = tree.generate_adjacency_graph(config, &mut rng);
         Map::new(graph)
+    }
+
+    pub fn get_rooms(&self) -> Vec<Room> {
+        self.adjacency_graph.get_rooms()
     }
 
     pub fn get_room_rects(&self) -> Vec<Rect> {
@@ -150,17 +191,15 @@ impl Map {
         self.adjacency_graph.get_door_rects()
     }
 
-    fn generate_room_tree(config: MapGenerationConfig) -> RoomBinaryTreeNode {
-        let mut rng = rand::thread_rng();
-
-        let room = Room::new(Rect::from_corners(
+    fn generate_room_tree(config: MapGenerationConfig, rng: &mut ThreadRng) -> RoomBinaryTreeNode {
+        let room = Room::empty(Rect::from_corners(
             Vec2::ZERO,
             Vec2::new(MAP_FLOOR_SIZE.0, MAP_FLOOR_SIZE.1),
         ));
 
         let mut errors = Vec::new();
         for _i in 0..MAX_MAP_GENERATION_ITERATIONS {
-            match RoomBinaryTreeNode::generate(&mut rng, config, room) {
+            match RoomBinaryTreeNode::generate(rng, config.clone(), room) {
                 Ok(m) => return m,
                 Err(e) => {
                     errors.push(format!("{:?}", e));
@@ -183,7 +222,7 @@ pub struct RoomBinaryTreeNode {
 
 impl From<Rect> for RoomBinaryTreeNode {
     fn from(value: Rect) -> Self {
-        Self::from(Room::new(value))
+        Self::from(Room::empty(value))
     }
 }
 
@@ -194,11 +233,19 @@ impl From<Room> for RoomBinaryTreeNode {
 }
 
 impl RoomBinaryTreeNode {
-    pub fn generate_adjacency_graph(&self) -> AdjacencyGraph {
+    pub fn generate_adjacency_graph(
+        &self,
+        config: MapGenerationConfig,
+        rng: &mut ThreadRng,
+    ) -> AdjacencyGraph {
         let mut to_return = InternalGraph::new_undirected();
         let mut nodes_to_rooms: Vec<_> = self
             .get_leaf_rooms()
             .into_iter()
+            .map(|mut room| {
+                room.update_room_type_from_weights(config.room_type_weights.clone(), rng);
+                return room;
+            })
             .map(|room| (to_return.add_node(room), room))
             .collect();
         assert_eq!(nodes_to_rooms.len(), N_ROOMS_PER_FLOOR);
@@ -332,14 +379,18 @@ impl AdjacencyGraph {
         Self(graph)
     }
 
-    pub fn get_room_rects(&self) -> Vec<Rect> {
+    pub fn get_rooms(&self) -> Vec<Room> {
         self.0
             .clone()
             .into_nodes_edges()
             .0
             .into_iter()
-            .map(|node| node.weight.rect)
+            .map(|node| node.weight)
             .collect()
+    }
+
+    pub fn get_room_rects(&self) -> Vec<Rect> {
+        self.get_rooms().into_iter().map(|room| room.rect).collect()
     }
 
     pub fn get_door_rects(&self) -> Vec<Rect> {
@@ -358,12 +409,13 @@ impl AdjacencyGraph {
 
 #[derive(Debug, Copy, Clone, PartialEq)]
 pub struct Room {
+    room_type: RoomType,
     rect: Rect,
 }
 
 impl Default for Room {
     fn default() -> Self {
-        Self::new(Rect::from_corners(
+        Self::empty(Rect::from_corners(
             Vec2::ZERO,
             Vec2::new(MAP_FLOOR_SIZE.0, MAP_FLOOR_SIZE.1),
         ))
@@ -371,8 +423,12 @@ impl Default for Room {
 }
 
 impl Room {
-    pub fn new(rect: Rect) -> Self {
-        Self { rect }
+    pub fn new(room_type: RoomType, rect: Rect) -> Self {
+        Self { room_type, rect }
+    }
+
+    pub fn empty(rect: Rect) -> Self {
+        Self::new(RoomType::Empty, rect)
     }
 
     pub fn get_potential_door_position(l_room: Self, r_room: Self) -> Option<DoorPosition> {
@@ -446,14 +502,32 @@ impl Room {
             true => {
                 let left = Rect::from_corners(self.min(), Vec2::new(point.x, self.max().y));
                 let right = Rect::from_corners(Vec2::new(point.x, self.min().y), self.max());
-                (Room::new(left), Room::new(right))
+                (
+                    Room::new(self.room_type, left),
+                    Room::new(self.room_type, right),
+                )
             }
             false => {
                 let bottom = Rect::from_corners(self.min(), Vec2::new(self.max().x, point.y));
                 let top = Rect::from_corners(Vec2::new(self.min().x, point.y), self.max());
-                (Room::new(bottom), Room::new(top))
+                (
+                    Room::new(self.room_type, bottom),
+                    Room::new(self.room_type, top),
+                )
             }
         }
+    }
+
+    pub fn update_room_type_from_weights(
+        &mut self,
+        weights: HashMap<RoomType, f32>,
+        rng: &mut ThreadRng,
+    ) {
+        let types = weights.keys().cloned().collect::<Vec<RoomType>>();
+        let index = WeightedIndex::new(weights.iter().map(|w| *w.1).collect::<Vec<f32>>())
+            .expect("The weights should be valid from the config.");
+        let room_type = types[index.sample(rng)];
+        self.room_type = room_type;
     }
 
     pub fn min(&self) -> Vec2 {
@@ -476,6 +550,36 @@ impl Room {
 #[derive(Debug, Copy, Clone, PartialEq)]
 pub enum MapGenerationError {
     RandomPointOverconstrained,
+}
+
+#[derive(Debug, Default, Copy, Clone, PartialEq, Eq, Hash)]
+pub enum RoomType {
+    #[default]
+    Empty,
+    Entrance,
+    Exit,
+    Combat,
+}
+
+impl RoomType {
+    pub fn to_string(&self) -> String {
+        match self {
+            Empty => "Empty",
+            Entrance => "Entrance",
+            Exit => "Exit",
+            Combat => "Combat",
+        }
+        .to_string()
+    }
+
+    pub fn to_color(&self) -> Color {
+        match self {
+            Empty => Color::WHITE,
+            Entrance => Color::YELLOW,
+            Exit => Color::GREEN,
+            Combat => Color::RED,
+        }
+    }
 }
 
 // End Helper Structs
@@ -546,7 +650,7 @@ mod tests {
 
     #[test]
     fn test_room_split() {
-        let room = Room::new(Rect::from_corners(Vec2::new(1.0, 2.0), Vec2::new(3.0, 5.0)));
+        let room = Room::empty(Rect::from_corners(Vec2::new(1.0, 2.0), Vec2::new(3.0, 5.0)));
         let (left, right) = room.split(Vec2::new(1.5, 3.0), true);
         assert!(left.min().distance(room.min()) <= 0.001);
         assert!(right.max().distance(room.max()) <= 0.001);
@@ -564,7 +668,7 @@ mod tests {
 
     #[test]
     fn test_random_point() {
-        let room = Room::new(Rect::from_corners(Vec2::new(1.0, 2.0), Vec2::new(3.0, 4.0)));
+        let room = Room::empty(Rect::from_corners(Vec2::new(1.0, 2.0), Vec2::new(3.0, 4.0)));
         let mut rng = rand::thread_rng();
 
         for _ in 0..100 {

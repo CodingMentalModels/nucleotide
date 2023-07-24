@@ -232,6 +232,8 @@ Algorithm:
 As a v0, implement via colored rectangles
 
 ## Enemies
+[ ] An enemy that bluffs you
+[ ] 
 
 ## Implementation Plan
 
@@ -276,6 +278,7 @@ As a v0, implement via colored rectangles
 [ ] Shock
 [ ] Gore
 [ ] Roll -- Damage that ignores block
+[ ] Suicidal Sting
 
 #### Defense
 [x] Block
@@ -307,4 +310,11 @@ As a v0, implement via colored rectangles
 
 
 ### Enemies
+
+
+## Graphics / Animation
+
+Hero's monster is caged or otherwise occluded from the player's view but each attack has an animation, with another extra cool one for a critical hit.
+
+
 

@@ -283,6 +283,10 @@ As a v0, implement via colored rectangles
 #### Defense
 [x] Block
 [ ] Camoflauge -- +50% Temporary Dodge
+[ ] Fly
+[ ] Take Off
+[ ] Leap
+[ ] Hop
 [ ] Run -- 100% Chance to excape the fight, but gain no rewards
 [ ] Bioluminescence
 [ ] Regenerate

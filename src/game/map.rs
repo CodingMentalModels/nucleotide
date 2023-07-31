@@ -51,6 +51,9 @@ fn update_map_system(mut commands: Commands, font: Res<LoadedFont>, map_state: R
         let (front_rect, back_rect) =
             get_front_and_back_room_sprites(&mut commands, rect, to_center_adjustment);
 
+        map_sprites.push(front_rect);
+        map_sprites.push(back_rect);
+
         let room_type_rect = Rect::from_center_size(rect.center(), Vec2::ONE * ROOM_TYPE_RECT_SIZE);
         let room_type_sprite = get_rect_sprite(
             &mut commands,
@@ -59,9 +62,25 @@ fn update_map_system(mut commands: Commands, font: Res<LoadedFont>, map_state: R
             to_center_adjustment,
             room_type.to_color(),
         );
-        map_sprites.push(front_rect);
-        map_sprites.push(back_rect);
+
         map_sprites.push(room_type_sprite);
+
+        let player_rect = Rect::from_center_size(
+            map_state
+                .0
+                .get_player_location()
+                .expect("The player should have been instantiated already."),
+            Vec2::ONE * PLAYER_RECT_ON_MAP_SIZE,
+        );
+        let player_sprite = get_rect_sprite(
+            &mut commands,
+            player_rect,
+            1.5,
+            to_center_adjustment,
+            Color::BLACK,
+        );
+
+        map_sprites.push(player_sprite);
     }
 
     let door_rects = map_state.0.get_door_rects();
@@ -190,6 +209,10 @@ impl Map {
 
     pub fn get_door_rects(&self) -> Vec<Rect> {
         self.adjacency_graph.get_door_rects()
+    }
+
+    pub fn get_player_location(&self) -> Option<Vec2> {
+        self.adjacency_graph.get_player_location()
     }
 
     fn generate_room_tree(config: MapGenerationConfig, rng: &mut ThreadRng) -> RoomBinaryTreeNode {
@@ -412,20 +435,33 @@ impl AdjacencyGraph {
             .collect()
     }
 
+    pub fn get_player_location(&self) -> Option<Vec2> {
+        self.0
+            .node_weights()
+            .find(|n| n.contains_player)
+            .map(|room| room.rect.center())
+    }
+
     pub fn designate_entrance(&mut self, rng: &mut ThreadRng) {
-        self.designate_random_room(rng, RoomType::Entrance);
+        self.designate_random_room(rng, RoomType::Entrance, true);
     }
 
     pub fn designate_exit(&mut self, rng: &mut ThreadRng) {
-        self.designate_random_room(rng, RoomType::Exit);
+        self.designate_random_room(rng, RoomType::Exit, false);
     }
 
-    fn designate_random_room(&mut self, rng: &mut ThreadRng, room_type: RoomType) {
+    fn designate_random_room(
+        &mut self,
+        rng: &mut ThreadRng,
+        room_type: RoomType,
+        contains_player: bool,
+    ) {
         let nodes = self.0.node_weights_mut();
         let node = nodes
             .choose(rng)
             .expect("There should be at least one node in the graph.");
         node.room_type = room_type;
+        node.contains_player = contains_player;
     }
 }
 
@@ -433,6 +469,7 @@ impl AdjacencyGraph {
 pub struct Room {
     room_type: RoomType,
     rect: Rect,
+    contains_player: bool,
 }
 
 impl Default for Room {
@@ -445,12 +482,16 @@ impl Default for Room {
 }
 
 impl Room {
-    pub fn new(room_type: RoomType, rect: Rect) -> Self {
-        Self { room_type, rect }
+    pub fn new(room_type: RoomType, rect: Rect, contains_player: bool) -> Self {
+        Self {
+            room_type,
+            rect,
+            contains_player,
+        }
     }
 
     pub fn empty(rect: Rect) -> Self {
-        Self::new(RoomType::Empty, rect)
+        Self::new(RoomType::Empty, rect, false)
     }
 
     pub fn get_potential_door_position(l_room: Self, r_room: Self) -> Option<DoorPosition> {
@@ -520,21 +561,25 @@ impl Room {
     }
 
     pub fn split(&self, point: Vec2, is_vertical: bool) -> (Room, Room) {
+        assert!(
+            !self.contains_player,
+            "Can't split up rooms if there's already been a player instantiated."
+        );
         match is_vertical {
             true => {
                 let left = Rect::from_corners(self.min(), Vec2::new(point.x, self.max().y));
                 let right = Rect::from_corners(Vec2::new(point.x, self.min().y), self.max());
                 (
-                    Room::new(self.room_type, left),
-                    Room::new(self.room_type, right),
+                    Room::new(self.room_type, left, false),
+                    Room::new(self.room_type, right, false),
                 )
             }
             false => {
                 let bottom = Rect::from_corners(self.min(), Vec2::new(self.max().x, point.y));
                 let top = Rect::from_corners(Vec2::new(self.min().x, point.y), self.max());
                 (
-                    Room::new(self.room_type, bottom),
-                    Room::new(self.room_type, top),
+                    Room::new(self.room_type, bottom, false),
+                    Room::new(self.room_type, top, false),
                 )
             }
         }

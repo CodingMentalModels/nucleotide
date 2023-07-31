@@ -51,9 +51,10 @@ fn update_map_system(mut commands: Commands, font: Res<LoadedFont>, map_state: R
         let (front_rect, back_rect) =
             get_front_and_back_room_sprites(&mut commands, rect, to_center_adjustment);
 
+        let room_type_rect = Rect::from_center_size(rect.center(), Vec2::ONE * ROOM_TYPE_RECT_SIZE);
         let room_type_sprite = get_rect_sprite(
             &mut commands,
-            rect.scale(0.2),
+            room_type_rect,
             2.0,
             to_center_adjustment,
             room_type.to_color(),
@@ -564,20 +565,20 @@ pub enum RoomType {
 impl RoomType {
     pub fn to_string(&self) -> String {
         match self {
-            Empty => "Empty",
-            Entrance => "Entrance",
-            Exit => "Exit",
-            Combat => "Combat",
+            Self::Empty => "Empty",
+            Self::Entrance => "Entrance",
+            Self::Exit => "Exit",
+            Self::Combat => "Combat",
         }
         .to_string()
     }
 
     pub fn to_color(&self) -> Color {
         match self {
-            Empty => Color::WHITE,
-            Entrance => Color::YELLOW,
-            Exit => Color::GREEN,
-            Combat => Color::RED,
+            Self::Empty => Color::WHITE,
+            Self::Entrance => Color::YELLOW,
+            Self::Exit => Color::GREEN,
+            Self::Combat => Color::RED,
         }
     }
 }

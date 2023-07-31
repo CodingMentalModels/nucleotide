@@ -272,7 +272,12 @@ impl RoomBinaryTreeNode {
         assert_eq!(connected_components(&to_return), 1);
 
         println!("n_edges: {}", to_return.edge_count());
-        return AdjacencyGraph::new(to_return);
+        let mut to_return = AdjacencyGraph::new(to_return);
+
+        to_return.designate_entrance(rng);
+        to_return.designate_exit(rng);
+
+        return to_return;
     }
 
     pub fn generate(
@@ -405,6 +410,22 @@ impl AdjacencyGraph {
                 Rect::from_corners(edge.weight - door_size / 2., edge.weight + door_size / 2.)
             })
             .collect()
+    }
+
+    pub fn designate_entrance(&mut self, rng: &mut ThreadRng) {
+        self.designate_random_room(rng, RoomType::Entrance);
+    }
+
+    pub fn designate_exit(&mut self, rng: &mut ThreadRng) {
+        self.designate_random_room(rng, RoomType::Exit);
+    }
+
+    fn designate_random_room(&mut self, rng: &mut ThreadRng, room_type: RoomType) {
+        let nodes = self.0.node_weights_mut();
+        let node = nodes
+            .choose(rng)
+            .expect("There should be at least one node in the graph.");
+        node.room_type = room_type;
     }
 }
 

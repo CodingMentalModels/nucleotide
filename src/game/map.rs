@@ -49,7 +49,7 @@ fn update_map_system(mut commands: Commands, font: Res<LoadedFont>, map_state: R
 
         let to_center_adjustment = Vec2::new(to_center_x, to_center_y);
         let (front_rect, back_rect) =
-            get_front_and_back_room_sprites(&mut commands, rect, to_center_adjustment);
+            get_front_and_back_room_sprites(&mut commands, room, to_center_adjustment);
 
         map_sprites.push(front_rect);
         map_sprites.push(back_rect);
@@ -438,30 +438,30 @@ impl AdjacencyGraph {
     pub fn get_player_location(&self) -> Option<Vec2> {
         self.0
             .node_weights()
-            .find(|n| n.contains_player)
+            .find(|n| n.explored_type == ExploredType::CurrentlyExploring)
             .map(|room| room.rect.center())
     }
 
     pub fn designate_entrance(&mut self, rng: &mut ThreadRng) {
-        self.designate_random_room(rng, RoomType::Entrance, true);
+        self.designate_random_room(rng, RoomType::Entrance, ExploredType::CurrentlyExploring);
     }
 
     pub fn designate_exit(&mut self, rng: &mut ThreadRng) {
-        self.designate_random_room(rng, RoomType::Exit, false);
+        self.designate_random_room(rng, RoomType::Exit, ExploredType::Unexplored);
     }
 
     fn designate_random_room(
         &mut self,
         rng: &mut ThreadRng,
         room_type: RoomType,
-        contains_player: bool,
+        explored_type: ExploredType,
     ) {
         let nodes = self.0.node_weights_mut();
         let node = nodes
             .choose(rng)
             .expect("There should be at least one node in the graph.");
         node.room_type = room_type;
-        node.contains_player = contains_player;
+        node.explored_type = explored_type;
     }
 }
 
@@ -469,7 +469,7 @@ impl AdjacencyGraph {
 pub struct Room {
     room_type: RoomType,
     rect: Rect,
-    contains_player: bool,
+    explored_type: ExploredType,
 }
 
 impl Default for Room {
@@ -482,16 +482,16 @@ impl Default for Room {
 }
 
 impl Room {
-    pub fn new(room_type: RoomType, rect: Rect, contains_player: bool) -> Self {
+    pub fn new(room_type: RoomType, rect: Rect, explored_type: ExploredType) -> Self {
         Self {
             room_type,
             rect,
-            contains_player,
+            explored_type,
         }
     }
 
     pub fn empty(rect: Rect) -> Self {
-        Self::new(RoomType::Empty, rect, false)
+        Self::new(RoomType::Empty, rect, ExploredType::Unexplored)
     }
 
     pub fn get_potential_door_position(l_room: Self, r_room: Self) -> Option<DoorPosition> {
@@ -561,8 +561,9 @@ impl Room {
     }
 
     pub fn split(&self, point: Vec2, is_vertical: bool) -> (Room, Room) {
-        assert!(
-            !self.contains_player,
+        assert_eq!(
+            self.explored_type,
+            ExploredType::Unexplored,
             "Can't split up rooms if there's already been a player instantiated."
         );
         match is_vertical {
@@ -570,16 +571,16 @@ impl Room {
                 let left = Rect::from_corners(self.min(), Vec2::new(point.x, self.max().y));
                 let right = Rect::from_corners(Vec2::new(point.x, self.min().y), self.max());
                 (
-                    Room::new(self.room_type, left, false),
-                    Room::new(self.room_type, right, false),
+                    Room::new(self.room_type, left, ExploredType::Unexplored),
+                    Room::new(self.room_type, right, ExploredType::Unexplored),
                 )
             }
             false => {
                 let bottom = Rect::from_corners(self.min(), Vec2::new(self.max().x, point.y));
                 let top = Rect::from_corners(Vec2::new(self.min().x, point.y), self.max());
                 (
-                    Room::new(self.room_type, bottom, false),
-                    Room::new(self.room_type, top, false),
+                    Room::new(self.room_type, bottom, ExploredType::Unexplored),
+                    Room::new(self.room_type, top, ExploredType::Unexplored),
                 )
             }
         }
@@ -611,6 +612,17 @@ impl Room {
 
     pub fn height(&self) -> f32 {
         self.rect.height()
+    }
+
+    pub fn get_color(&self) -> Color {
+        let blueprint_blue = Color::rgb(BLUEPRINT_BLUE.0, BLUEPRINT_BLUE.1, BLUEPRINT_BLUE.2);
+        let blueprint_gray = color_lerp(blueprint_blue, get_grayscale(blueprint_blue), 0.75);
+        match self.explored_type {
+            ExploredType::Unexplored => blueprint_gray,
+            ExploredType::PreviouslyExplored => blueprint_blue,
+            ExploredType::CurrentlyExploring => blueprint_blue,
+            ExploredType::Adjacent => blueprint_gray,
+        }
     }
 }
 
@@ -649,6 +661,15 @@ impl RoomType {
     }
 }
 
+#[derive(Debug, Default, Copy, Clone, PartialEq, Eq, Hash)]
+pub enum ExploredType {
+    #[default]
+    Unexplored,
+    PreviouslyExplored,
+    CurrentlyExploring,
+    Adjacent,
+}
+
 // End Helper Structs
 
 //Helper Functions
@@ -667,17 +688,23 @@ fn get_potential_rect_intersection_center(l_rect: Rect, r_rect: Rect) -> Option<
 
 fn get_front_and_back_room_sprites(
     commands: &mut Commands,
-    rect: Rect,
+    room: Room,
     global_translation: Vec2,
 ) -> (Entity, Entity) {
-    let blueprint_blue = Color::rgb(BLUEPRINT_BLUE.0, BLUEPRINT_BLUE.1, BLUEPRINT_BLUE.2);
+    let rect = room.rect;
+    let background_color = room.get_color();
     let back_sprite = get_rect_sprite(commands, rect, 0., global_translation, Color::WHITE);
     let front_rect = Rect::from_corners(
         rect.min + WALL_WIDTH * Vec2::ONE,
         rect.max - WALL_WIDTH * Vec2::ONE,
     );
-    let front_sprite =
-        get_rect_sprite(commands, front_rect, 1., global_translation, blueprint_blue);
+    let front_sprite = get_rect_sprite(
+        commands,
+        front_rect,
+        1.,
+        global_translation,
+        background_color,
+    );
 
     return (front_sprite, back_sprite);
 }
@@ -706,6 +733,24 @@ fn get_rect_sprite(
 
 fn round_to_nearest(f: f32, nearest: f32) -> f32 {
     (f / nearest).round() * nearest
+}
+
+fn get_grayscale(color: Color) -> Color {
+    // ChatGPT formula for grayness
+    let luminosity = 0.21 * color.r() + 0.72 * color.g() + 0.07 * color.b();
+
+    return Color::rgb(luminosity, luminosity, luminosity);
+}
+
+fn color_lerp(left: Color, right: Color, t: f32) -> Color {
+    assert!(t >= 0.0);
+    assert!(t <= 1.0);
+
+    Color::rgb(
+        left.r() * (1. - t) + right.r() * t,
+        left.g() * (1. - t) + right.g() * t,
+        left.b() * (1. - t) + right.b() * t,
+    )
 }
 //End Helper Functions
 

@@ -1,4 +1,5 @@
 use std::collections::HashMap;
+use std::collections::HashSet;
 
 use crate::game::constants::*;
 use crate::game::resources::*;
@@ -443,11 +444,17 @@ impl AdjacencyGraph {
     }
 
     pub fn designate_entrance(&mut self, rng: &mut ThreadRng) {
-        self.designate_random_room(rng, RoomType::Entrance, ExploredType::CurrentlyExploring);
+        self.designate_random_room(
+            rng,
+            RoomType::Entrance,
+            ExploredType::CurrentlyExploring,
+            HashSet::new(),
+        );
     }
 
     pub fn designate_exit(&mut self, rng: &mut ThreadRng) {
-        self.designate_random_room(rng, RoomType::Exit, ExploredType::Unexplored);
+        let blocklist = vec![RoomType::Entrance].into_iter().collect();
+        self.designate_random_room(rng, RoomType::Exit, ExploredType::Unexplored, blocklist);
     }
 
     fn designate_random_room(
@@ -455,13 +462,18 @@ impl AdjacencyGraph {
         rng: &mut ThreadRng,
         room_type: RoomType,
         explored_type: ExploredType,
+        blocklisted_room_types: HashSet<RoomType>,
     ) {
-        let nodes = self.0.node_weights_mut();
-        let node = nodes
+        let mut nodes: Vec<&mut Room> = self
+            .0
+            .node_weights_mut()
+            .filter(|w| !blocklisted_room_types.contains(&w.room_type))
+            .collect();
+        let index = (0..nodes.len())
             .choose(rng)
             .expect("There should be at least one node in the graph.");
-        node.room_type = room_type;
-        node.explored_type = explored_type;
+        nodes[index].room_type = room_type;
+        nodes[index].explored_type = explored_type;
     }
 }
 

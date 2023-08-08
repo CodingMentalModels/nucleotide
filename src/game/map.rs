@@ -5,6 +5,8 @@ use bevy::prelude::*;
 use bevy::sprite::MaterialMesh2dBundle;
 use bevy_mod_raycast::RaycastMesh;
 use petgraph::algo::connected_components;
+use petgraph::graph::NodeIndex;
+use petgraph::graph::NodeIndices;
 use petgraph::graph::UnGraph;
 use rand::distributions::WeightedIndex;
 use rand::prelude::*;
@@ -29,6 +31,10 @@ impl Plugin for MapPlugin {
                 OnEnter(NucleotideState::SelectingRoom),
                 initialize_map_system,
             )
+            .add_systems(
+                Update,
+                update_map_system.run_if(in_state(NucleotideState::SelectingRoom)),
+            )
             .add_systems(OnExit(NucleotideState::SelectingRoom), despawn_map_system);
     }
 }
@@ -48,14 +54,18 @@ fn initialize_map_system(
     mut commands: Commands,
     mut meshes: ResMut<Assets<Mesh>>,
     mut materials: ResMut<Assets<ColorMaterial>>,
-    font: Res<LoadedFont>,
     map_state: Res<MapState>,
 ) {
-    let rooms = map_state.0.get_rooms();
+    let node_indices = map_state.0.get_node_indices();
     let mut map_sprites = Vec::new();
+    let mut to_add_adjacencies = Vec::new();
     let to_center_x = -MAP_FLOOR_SIZE.0 / 2.;
     let to_center_y = -MAP_FLOOR_SIZE.1 / 2.;
-    for room in rooms {
+    for node_index in node_indices {
+        let room = map_state
+            .0
+            .get_room(node_index)
+            .expect("Node indices are guaranteed to exist.");
         let rect = room.rect;
         let room_type = room.room_type;
 
@@ -66,10 +76,13 @@ fn initialize_map_system(
             &mut materials,
             room,
             to_center_adjustment,
+            node_index,
         );
 
         map_sprites.push(front_rect);
         map_sprites.push(back_rect);
+
+        to_add_adjacencies.push((node_index, back_rect));
 
         let room_type_rect = Rect::from_center_size(rect.center(), Vec2::ONE * ROOM_TYPE_RECT_SIZE);
         let room_type_sprite = get_rect_sprite(
@@ -104,6 +117,24 @@ fn initialize_map_system(
         map_sprites.push(player_sprite);
     }
 
+    to_add_adjacencies.iter().for_each(|(node_index, sprite)| {
+        let adjacent_nodes = map_state.0.get_adjacent_node_indices(*node_index);
+        let adjacent_sprites = adjacent_nodes
+            .into_iter()
+            .map(|idx| {
+                to_add_adjacencies
+                    .iter()
+                    .filter(|(n, _)| *n == idx)
+                    .map(|(_, s)| *s)
+                    .collect::<HashSet<_>>()
+            })
+            .flatten()
+            .collect();
+        commands
+            .entity(*sprite)
+            .insert(AdjacentRoomSprites(adjacent_sprites));
+    });
+
     let door_rects = map_state.0.get_door_rects();
     for rect in door_rects {
         let door_sprite = get_rect_sprite(
@@ -119,6 +150,24 @@ fn initialize_map_system(
     }
 
     commands.insert_resource(MapSprites(map_sprites));
+}
+
+fn update_map_system(
+    mut commands: Commands,
+    mut materials: ResMut<Assets<ColorMaterial>>,
+    player_sprite_query: Query<&AdjacentRoomSprites, With<ContainsPlayerComponent>>,
+    query: Query<Entity, With<Handle<ColorMaterial>>>,
+) {
+    let adjacent_room_sprites = player_sprite_query.single();
+    for entity in query
+        .into_iter()
+        .filter(|entity| adjacent_room_sprites.0.contains(entity))
+        .collect::<HashSet<_>>()
+    {
+        commands
+            .entity(entity)
+            .insert(materials.add(ColorMaterial::from(Color::GREEN)));
+    }
 }
 
 fn despawn_map_system(mut commands: Commands, map_sprites: Res<MapSprites>) {
@@ -199,6 +248,19 @@ pub struct MapSprites(Vec<Entity>);
 
 //End Resources
 
+// Components
+
+#[derive(Debug, Clone, Component)]
+pub struct NodeIndexComponent(NodeIndex);
+
+#[derive(Debug, Clone, Component)]
+pub struct AdjacentRoomSprites(HashSet<Entity>);
+
+#[derive(Debug, Clone, Component)]
+pub struct ContainsPlayerComponent;
+
+// End Components
+
 // Helper Structs
 #[derive(Debug, Clone)]
 pub struct Map {
@@ -220,6 +282,18 @@ impl Map {
         let tree = Self::generate_room_tree(config.clone(), &mut rng);
         let graph = tree.generate_adjacency_graph(config, &mut rng);
         Map::new(graph)
+    }
+
+    pub fn get_adjacent_node_indices(&self, node_index: NodeIndex) -> HashSet<NodeIndex> {
+        self.adjacency_graph.get_adjacent_node_indices(node_index)
+    }
+
+    pub fn get_node_indices(&self) -> NodeIndices<u32> {
+        self.adjacency_graph.get_node_indices()
+    }
+
+    pub fn get_room(&self, node_index: NodeIndex) -> Option<Room> {
+        self.adjacency_graph.get_room(node_index)
     }
 
     pub fn get_rooms(&self) -> Vec<Room> {
@@ -429,6 +503,18 @@ impl AdjacencyGraph {
     }
     pub fn new(graph: InternalGraph) -> Self {
         Self(graph)
+    }
+
+    pub fn get_adjacent_node_indices(&self, node_index: NodeIndex) -> HashSet<NodeIndex> {
+        self.0.neighbors(node_index).collect()
+    }
+
+    pub fn get_node_indices(&self) -> NodeIndices<u32> {
+        self.0.node_indices()
+    }
+
+    pub fn get_room(&self, node_index: NodeIndex) -> Option<Room> {
+        self.0.node_weight(node_index).map(|r| *r)
     }
 
     pub fn get_rooms(&self) -> Vec<Room> {
@@ -648,6 +734,10 @@ impl Room {
         self.rect.height()
     }
 
+    pub fn contains_player(&self) -> bool {
+        self.explored_type == ExploredType::CurrentlyExploring
+    }
+
     pub fn get_color(&self) -> Color {
         let blueprint_blue = Color::rgb(BLUEPRINT_BLUE.0, BLUEPRINT_BLUE.1, BLUEPRINT_BLUE.2);
         let blueprint_gray = color_lerp(blueprint_blue, get_grayscale(blueprint_blue), 0.75);
@@ -726,6 +816,7 @@ fn get_front_and_back_room_sprites(
     materials: &mut Assets<ColorMaterial>,
     room: Room,
     global_translation: Vec2,
+    node_index: NodeIndex,
 ) -> (Entity, Entity) {
     let rect = room.rect;
     let background_color = room.get_color();
@@ -738,6 +829,9 @@ fn get_front_and_back_room_sprites(
         global_translation,
         Color::WHITE,
     );
+    commands
+        .entity(back_sprite)
+        .insert(NodeIndexComponent(node_index));
     let front_rect = Rect::from_corners(
         rect.min + WALL_WIDTH * Vec2::ONE,
         rect.max - WALL_WIDTH * Vec2::ONE,
@@ -751,6 +845,16 @@ fn get_front_and_back_room_sprites(
         global_translation,
         background_color,
     );
+    commands
+        .entity(front_sprite)
+        .insert(NodeIndexComponent(node_index));
+
+    if room.contains_player() {
+        commands.entity(back_sprite).insert(ContainsPlayerComponent);
+        commands
+            .entity(front_sprite)
+            .insert(ContainsPlayerComponent);
+    }
 
     return (front_sprite, back_sprite);
 }

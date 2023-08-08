@@ -1,15 +1,18 @@
 use std::collections::HashMap;
 use std::collections::HashSet;
 
-use crate::game::constants::*;
-use crate::game::resources::*;
 use bevy::prelude::*;
+use bevy_mod_raycast::RaycastMesh;
 use petgraph::algo::connected_components;
 use petgraph::graph::UnGraph;
 use rand::distributions::WeightedIndex;
 use rand::prelude::*;
 use rand::rngs::ThreadRng;
 use rand::Rng;
+
+use crate::game::constants::*;
+use crate::game::input::MouseoverRaycastSet;
+use crate::game::resources::*;
 
 type XCoordinate = u32;
 type YCoordinate = u32;
@@ -20,11 +23,12 @@ pub struct MapPlugin;
 
 impl Plugin for MapPlugin {
     fn build(&self, app: &mut App) {
-        app.add_systems((
-            generate_map_system.in_schedule(OnEnter(NucleotideState::GeneratingMap)),
-            update_map_system.in_schedule(OnEnter(NucleotideState::SelectingRoom)),
-            despawn_map_system.in_schedule(OnExit(NucleotideState::SelectingRoom)),
-        ));
+        app.add_systems(OnEnter(NucleotideState::GeneratingMap), generate_map_system)
+            .add_systems(
+                OnEnter(NucleotideState::SelectingRoom),
+                initialize_map_system,
+            )
+            .add_systems(OnExit(NucleotideState::SelectingRoom), despawn_map_system);
     }
 }
 
@@ -39,7 +43,7 @@ fn generate_map_system(mut commands: Commands) {
     commands.insert_resource(NextState(Some(NucleotideState::SelectingRoom)));
 }
 
-fn update_map_system(mut commands: Commands, font: Res<LoadedFont>, map_state: Res<MapState>) {
+fn initialize_map_system(mut commands: Commands, font: Res<LoadedFont>, map_state: Res<MapState>) {
     let rooms = map_state.0.get_rooms();
     let mut map_sprites = Vec::new();
     let to_center_x = -MAP_FLOOR_SIZE.0 / 2.;
@@ -740,6 +744,7 @@ fn get_rect_sprite(
             ),
             ..default()
         })
+        .insert(RaycastMesh::<MouseoverRaycastSet>::default())
         .id()
 }
 

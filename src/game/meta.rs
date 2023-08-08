@@ -8,9 +8,10 @@ pub struct MetaPlugin;
 
 impl Plugin for MetaPlugin {
     fn build(&self, app: &mut App) {
-        app.add_systems((
-            instantiate_meta_system.in_schedule(OnEnter(NucleotideState::InstantiatingMeta)),
-        ));
+        app.add_systems(
+            OnEnter(NucleotideState::InstantiatingMeta),
+            instantiate_meta_system,
+        );
     }
 }
 

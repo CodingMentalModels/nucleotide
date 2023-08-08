@@ -1,9 +1,11 @@
 use bevy::window::PrimaryWindow;
 use bevy::{asset::LoadState, prelude::*};
 use bevy_egui::{egui, EguiContexts, EguiPlugin};
+use bevy_mod_raycast::RaycastSource;
 use egui::{RichText, Ui};
 
 use crate::game::constants::*;
+use crate::game::input::MouseoverRaycastSet;
 use crate::game::resources::*;
 
 use super::battle::{GenomeComponent, LogState};
@@ -33,20 +35,47 @@ impl Plugin for UIPlugin {
         let or_paused_condition =
             |state: NucleotideState| in_state(NucleotideState::Paused).or_else(in_state(state));
 
-        app.add_plugin(EguiPlugin).add_systems((
-            configure_visuals.in_schedule(OnEnter(NucleotideState::LoadingUI)),
-            ui_load_system.in_schedule(OnEnter(NucleotideState::LoadingUI)),
-            render_initializing_battle_system.run_if(in_state(NucleotideState::InitializingBattle)),
-            render_battle_system.run_if(get_battle_states_condition()),
-            render_paused_system.run_if(in_state(NucleotideState::Paused)),
-            render_game_over_system.run_if(in_state(NucleotideState::GameOver)),
-            render_victory_system.run_if(in_state(NucleotideState::Victory)),
-            render_select_reward_system.run_if(in_state(NucleotideState::SelectBattleReward)),
-            render_select_gene_from_enemy_system
-                .run_if(in_state(NucleotideState::SelectGeneFromEnemy)),
-            render_move_gene.run_if(in_state(NucleotideState::MoveGene)),
-            render_swap_genes.run_if(in_state(NucleotideState::SwapGenes)),
-        ));
+        app.add_plugins(EguiPlugin)
+            .add_systems(OnEnter(NucleotideState::LoadingUI), configure_visuals)
+            .add_systems(OnEnter(NucleotideState::LoadingUI), ui_load_system)
+            .add_systems(
+                Update,
+                render_initializing_battle_system
+                    .run_if(in_state(NucleotideState::InitializingBattle)),
+            )
+            .add_systems(
+                Update,
+                render_battle_system.run_if(get_battle_states_condition()),
+            )
+            .add_systems(
+                Update,
+                render_paused_system.run_if(in_state(NucleotideState::Paused)),
+            )
+            .add_systems(
+                Update,
+                render_game_over_system.run_if(in_state(NucleotideState::GameOver)),
+            )
+            .add_systems(
+                Update,
+                render_victory_system.run_if(in_state(NucleotideState::Victory)),
+            )
+            .add_systems(
+                Update,
+                render_select_reward_system.run_if(in_state(NucleotideState::SelectBattleReward)),
+            )
+            .add_systems(
+                Update,
+                render_select_gene_from_enemy_system
+                    .run_if(in_state(NucleotideState::SelectGeneFromEnemy)),
+            )
+            .add_systems(
+                Update,
+                render_move_gene.run_if(in_state(NucleotideState::MoveGene)),
+            )
+            .add_systems(
+                Update,
+                render_swap_genes.run_if(in_state(NucleotideState::SwapGenes)),
+            );
 
         app.insert_resource(InitializingBattleUIState::default());
         app.insert_resource(InBattleUIState::from_state(
@@ -82,7 +111,9 @@ fn ui_load_system(mut commands: Commands, asset_server: Res<AssetServer>) {
 
     commands.insert_resource(LoadedFont(font.clone()));
 
-    commands.spawn(Camera2dBundle::default());
+    commands
+        .spawn(Camera2dBundle::default())
+        .insert(RaycastSource::<MouseoverRaycastSet>::new());
 
     commands.insert_resource(NextState(Some(NucleotideState::InstantiatingMeta)));
 }

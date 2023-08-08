@@ -1,4 +1,6 @@
-#[derive(Debug, Clone, Copy, Hash, PartialEq, Eq)]
+use bevy::prelude::*;
+
+#[derive(Debug, Clone, Copy, Hash, PartialEq, Eq, Event)]
 pub enum BattleActionEvent {
     Continue,
     RunAway,

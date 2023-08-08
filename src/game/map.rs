@@ -2,6 +2,7 @@ use std::collections::HashMap;
 use std::collections::HashSet;
 
 use bevy::prelude::*;
+use bevy::sprite::MaterialMesh2dBundle;
 use bevy_mod_raycast::RaycastMesh;
 use petgraph::algo::connected_components;
 use petgraph::graph::UnGraph;
@@ -43,7 +44,13 @@ fn generate_map_system(mut commands: Commands) {
     commands.insert_resource(NextState(Some(NucleotideState::SelectingRoom)));
 }
 
-fn initialize_map_system(mut commands: Commands, font: Res<LoadedFont>, map_state: Res<MapState>) {
+fn initialize_map_system(
+    mut commands: Commands,
+    mut meshes: ResMut<Assets<Mesh>>,
+    mut materials: ResMut<Assets<ColorMaterial>>,
+    font: Res<LoadedFont>,
+    map_state: Res<MapState>,
+) {
     let rooms = map_state.0.get_rooms();
     let mut map_sprites = Vec::new();
     let to_center_x = -MAP_FLOOR_SIZE.0 / 2.;
@@ -53,8 +60,13 @@ fn initialize_map_system(mut commands: Commands, font: Res<LoadedFont>, map_stat
         let room_type = room.room_type;
 
         let to_center_adjustment = Vec2::new(to_center_x, to_center_y);
-        let (front_rect, back_rect) =
-            get_front_and_back_room_sprites(&mut commands, room, to_center_adjustment);
+        let (front_rect, back_rect) = get_front_and_back_room_sprites(
+            &mut commands,
+            &mut meshes,
+            &mut materials,
+            room,
+            to_center_adjustment,
+        );
 
         map_sprites.push(front_rect);
         map_sprites.push(back_rect);
@@ -62,6 +74,8 @@ fn initialize_map_system(mut commands: Commands, font: Res<LoadedFont>, map_stat
         let room_type_rect = Rect::from_center_size(rect.center(), Vec2::ONE * ROOM_TYPE_RECT_SIZE);
         let room_type_sprite = get_rect_sprite(
             &mut commands,
+            &mut meshes,
+            &mut materials,
             room_type_rect,
             2.0,
             to_center_adjustment,
@@ -79,6 +93,8 @@ fn initialize_map_system(mut commands: Commands, font: Res<LoadedFont>, map_stat
         );
         let player_sprite = get_rect_sprite(
             &mut commands,
+            &mut meshes,
+            &mut materials,
             player_rect,
             1.5,
             to_center_adjustment,
@@ -92,6 +108,8 @@ fn initialize_map_system(mut commands: Commands, font: Res<LoadedFont>, map_stat
     for rect in door_rects {
         let door_sprite = get_rect_sprite(
             &mut commands,
+            &mut meshes,
+            &mut materials,
             rect,
             2.0,
             Vec2::new(to_center_x, to_center_y),
@@ -704,18 +722,30 @@ fn get_potential_rect_intersection_center(l_rect: Rect, r_rect: Rect) -> Option<
 
 fn get_front_and_back_room_sprites(
     commands: &mut Commands,
+    meshes: &mut Assets<Mesh>,
+    materials: &mut Assets<ColorMaterial>,
     room: Room,
     global_translation: Vec2,
 ) -> (Entity, Entity) {
     let rect = room.rect;
     let background_color = room.get_color();
-    let back_sprite = get_rect_sprite(commands, rect, 0., global_translation, Color::WHITE);
+    let back_sprite = get_rect_sprite(
+        commands,
+        meshes,
+        materials,
+        rect,
+        0.,
+        global_translation,
+        Color::WHITE,
+    );
     let front_rect = Rect::from_corners(
         rect.min + WALL_WIDTH * Vec2::ONE,
         rect.max - WALL_WIDTH * Vec2::ONE,
     );
     let front_sprite = get_rect_sprite(
         commands,
+        meshes,
+        materials,
         front_rect,
         1.,
         global_translation,
@@ -727,21 +757,20 @@ fn get_front_and_back_room_sprites(
 
 fn get_rect_sprite(
     commands: &mut Commands,
+    meshes: &mut Assets<Mesh>,
+    materials: &mut Assets<ColorMaterial>,
     rect: Rect,
     z_value: f32,
     global_translation: Vec2,
     color: Color,
 ) -> Entity {
     commands
-        .spawn(SpriteBundle {
-            sprite: Sprite {
-                color: color,
-                custom_size: Some(rect.size()),
-                ..default()
-            },
+        .spawn(MaterialMesh2dBundle {
+            mesh: meshes.add(Mesh::from(shape::Quad::new(rect.size()))).into(),
             transform: Transform::from_translation(
                 rect.center().extend(z_value) + global_translation.extend(0.),
             ),
+            material: materials.add(ColorMaterial::from(color)),
             ..default()
         })
         .insert(RaycastMesh::<MouseoverRaycastSet>::default())

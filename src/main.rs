@@ -20,13 +20,13 @@ fn main() {
             DefaultPlugins,
             DefaultRaycastingPlugin::<MouseoverRaycastSet>::default(),
         ))
-        .add_plugin(AssetsPlugin)
-        .add_plugin(UIPlugin)
-        .add_plugin(InputPlugin)
-        .add_plugin(BattlePlugin)
-        .add_plugin(MetaPlugin)
-        .add_plugin(MapPlugin)
-        .add_plugin(PausePlugin)
+        .add_plugins(AssetsPlugin)
+        .add_plugins(UIPlugin)
+        .add_plugins(InputPlugin)
+        .add_plugins(BattlePlugin)
+        .add_plugins(MetaPlugin)
+        .add_plugins(MapPlugin)
+        .add_plugins(PausePlugin)
         .add_state::<NucleotideState>()
         .run();
 }

@@ -12,7 +12,7 @@ impl Plugin for InputPlugin {
                 First,
                 update_raycast_with_cursor.before(RaycastSystem::BuildRays::<MouseoverRaycastSet>),
             )
-            .add_systems(Update, print_intersections::<MouseoverRaycastSet>)
+            //.add_systems(Update, print_intersections::<MouseoverRaycastSet>)
             .add_systems(Update, input_system);
     }
 }

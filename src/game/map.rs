@@ -155,18 +155,36 @@ fn initialize_map_system(
 fn update_map_system(
     mut commands: Commands,
     mut materials: ResMut<Assets<ColorMaterial>>,
-    player_sprite_query: Query<&AdjacentRoomSprites, With<ContainsPlayerComponent>>,
-    query: Query<Entity, With<Handle<ColorMaterial>>>,
+    mut player_sprite_query: Query<(Entity, &mut Transform), With<PlayerSpriteOnMap>>,
+    hoverables_query: Query<
+        (Entity, &RaycastMesh<MouseoverRaycastSet>, &Transform),
+        Without<PlayerSpriteOnMap>,
+    >,
+    player_room_query: Query<&AdjacentRoomSprites, With<ContainsPlayerComponent>>,
 ) {
-    let adjacent_room_sprites = player_sprite_query.single();
-    for entity in query
-        .into_iter()
-        .filter(|entity| adjacent_room_sprites.0.contains(entity))
-        .collect::<HashSet<_>>()
-    {
+    let adjacent_rooms: HashSet<Entity> = player_room_query.single().0.clone();
+    for entity in adjacent_rooms.iter() {
         commands
-            .entity(entity)
+            .entity(*entity)
             .insert(materials.add(ColorMaterial::from(Color::GREEN)));
+    }
+
+    let maybe_hovered_room = hoverables_query
+        .into_iter()
+        .filter(|(entity, raycast, _)| {
+            raycast.intersections().len() > 0 && adjacent_rooms.contains(entity)
+        })
+        .next();
+    for (_, mut player_transform) in player_sprite_query.iter_mut() {
+        match maybe_hovered_room {
+            Some((_, _, transform)) => {
+                info!("Moving player transform.");
+                *player_transform = *transform;
+            }
+            None => {
+                // Do nothing
+            }
+        }
     }
 }
 
@@ -255,6 +273,9 @@ pub struct NodeIndexComponent(NodeIndex);
 
 #[derive(Debug, Clone, Component)]
 pub struct AdjacentRoomSprites(HashSet<Entity>);
+
+#[derive(Debug, Clone, Component)]
+pub struct PlayerSpriteOnMap;
 
 #[derive(Debug, Clone, Component)]
 pub struct ContainsPlayerComponent;

@@ -1,6 +1,7 @@
 use std::collections::HashMap;
 use std::collections::HashSet;
 
+use bevy::input::common_conditions::input_just_pressed;
 use bevy::prelude::*;
 use bevy::sprite::MaterialMesh2dBundle;
 use bevy_mod_raycast::RaycastMesh;
@@ -34,6 +35,10 @@ impl Plugin for MapPlugin {
             .add_systems(
                 Update,
                 update_map_system.run_if(in_state(NucleotideState::SelectingRoom)),
+            )
+            .add_systems(
+                Update,
+                handle_click_system.run_if(input_just_pressed(MouseButton::Left)),
             )
             .add_systems(OnExit(NucleotideState::SelectingRoom), despawn_map_system);
     }
@@ -176,10 +181,7 @@ fn update_map_system(
         })
         .next();
     let hovered_player_room = match maybe_hovered_room {
-        Some((entity, _, _, _)) => {
-            info!("Moving player transform.");
-            entity
-        }
+        Some((entity, _, _, _)) => entity,
         None => player_room_entity,
     };
 
@@ -198,6 +200,53 @@ fn update_map_system(
     commands
         .entity(hovered_player_room)
         .add_child(player_sprite);
+}
+
+fn handle_click_system(
+    mut commands: Commands,
+    mut map_state: ResMut<MapState>,
+    hoverable_query: Query<
+        (
+            Entity,
+            &RaycastMesh<MouseoverRaycastSet>,
+            &NodeIndexComponent,
+            &RoomTypeComponent,
+        ),
+        With<BackRoomComponent>,
+    >,
+    front_room_query: Query<(Entity, &mut Handle<ColorMaterial>), With<FrontRoomComponent>>,
+) {
+    info!("Click!");
+    let intersections = hoverable_query
+        .iter()
+        .filter(|(_, raycast, _, _)| raycast.intersections().len() == 1)
+        .collect::<Vec<_>>();
+    if intersections.len() != 1 {
+        info!("Multiple hoverables: {:?}", hoverable_query);
+        return;
+    }
+
+    let (_, _, new_room_node_index, room_type) = intersections
+        .into_iter()
+        .next()
+        .expect("We just confirmed there was exactly 1.");
+
+    info!(
+        "Updating player node to {:?} ({:?})",
+        new_room_node_index, room_type
+    );
+
+    map_state.0.update_player_node(new_room_node_index.0);
+    match room_type.0 {
+        RoomType::Combat => {
+            commands.insert_resource(NextState(Some(NucleotideState::InitializingBattle)));
+        }
+        _ => {
+            // Do nothing
+        }
+    }
+
+    front_room_query.for_each(|e| commands.entity(e))
 }
 
 fn despawn_map_system(mut commands: Commands, map_sprites: Res<MapSprites>) {
@@ -279,6 +328,14 @@ pub struct MapSprites(Vec<Entity>);
 //End Resources
 
 // Components
+#[derive(Debug, Clone, Component)]
+pub struct PlayerSpriteOnMap;
+
+#[derive(Debug, Clone, Component)]
+pub struct FrontRoomComponent;
+
+#[derive(Debug, Clone, Component)]
+pub struct BackRoomComponent;
 
 #[derive(Debug, Clone, Component)]
 pub struct NodeIndexComponent(NodeIndex);
@@ -287,11 +344,10 @@ pub struct NodeIndexComponent(NodeIndex);
 pub struct AdjacentRoomSprites(HashSet<Entity>);
 
 #[derive(Debug, Clone, Component)]
-pub struct PlayerSpriteOnMap;
-
-#[derive(Debug, Clone, Component)]
 pub struct ContainsPlayerComponent;
 
+#[derive(Debug, Clone, Component)]
+pub struct RoomTypeComponent(RoomType);
 // End Components
 
 // Helper Structs
@@ -339,6 +395,10 @@ impl Map {
 
     pub fn get_door_rects(&self) -> Vec<Rect> {
         self.adjacency_graph.get_door_rects()
+    }
+
+    pub fn update_player_node(&mut self, node_index: NodeIndex) {
+        self.adjacency_graph.update_player_node(node_index);
     }
 
     pub fn get_player_room_index(&self) -> Option<NodeIndex> {
@@ -579,6 +639,25 @@ impl AdjacencyGraph {
                 Rect::from_corners(edge.weight - door_size / 2., edge.weight + door_size / 2.)
             })
             .collect()
+    }
+
+    pub fn update_player_node(&mut self, node_index: NodeIndex) {
+        self.0.node_indices().for_each(|idx| {
+            let mut node_weight = self
+                .0
+                .node_weight_mut(idx)
+                .expect("Index is guaranteed to exist");
+            if node_index == idx {
+                node_weight.explored_type = ExploredType::CurrentlyExploring
+            } else {
+                node_weight.explored_type =
+                    if node_weight.explored_type == ExploredType::CurrentlyExploring {
+                        ExploredType::PreviouslyExplored
+                    } else {
+                        node_weight.explored_type
+                    };
+            }
+        })
     }
 
     pub fn get_player_room_index(&self) -> Option<NodeIndex> {
@@ -878,7 +957,10 @@ fn get_front_and_back_room_sprites(
     );
     commands
         .entity(back_sprite)
-        .insert(NodeIndexComponent(node_index));
+        .insert(BackRoomSpriteComponent)
+        .insert(NodeIndexComponent(node_index))
+        .insert(RoomTypeComponent(room.room_type));
+
     let front_rect = Rect::from_corners(
         rect.min + WALL_WIDTH * Vec2::ONE,
         rect.max - WALL_WIDTH * Vec2::ONE,
@@ -894,7 +976,9 @@ fn get_front_and_back_room_sprites(
     );
     commands
         .entity(front_sprite)
-        .insert(NodeIndexComponent(node_index));
+        .insert(FrontRoomSpriteComponent)
+        .insert(NodeIndexComponent(node_index))
+        .insert(RoomTypeComponent(room.room_type));
 
     if room.contains_player() {
         commands.entity(back_sprite).insert(ContainsPlayerComponent);

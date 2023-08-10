@@ -179,7 +179,7 @@ fn initialize_battle_system(
     enemy_specs: Res<EnemySpecs>,
     gene_specs: Res<GeneSpecs>,
     player: Res<Player>,
-    mut enemy_queue: ResMut<EnemyQueue>,
+    mut enemy_queue: ResMut<EnemyPool>,
     current_state: Res<State<NucleotideState>>,
     mut next_state: ResMut<NextState<NucleotideState>>,
 ) {

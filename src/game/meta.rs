@@ -36,7 +36,7 @@ fn instantiate_meta_system(mut commands: Commands, enemy_specs: Res<EnemySpecs>)
         player_genome,
     );
 
-    let enemy_queue = EnemyQueue(enemy_specs.get_names());
+    let enemy_queue = EnemyPool(enemy_specs.get_names());
 
     commands.insert_resource(player);
     commands.insert_resource(enemy_queue);

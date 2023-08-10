@@ -54,7 +54,7 @@ fn update_raycast_with_cursor(
 // End Systems
 
 // Structs
-#[derive(Clone, Reflect)]
+#[derive(Debug, Clone, Reflect)]
 pub struct MouseoverRaycastSet;
 
 // End Structs

@@ -59,8 +59,7 @@ fn initialize_map_system(
     let node_indices = map_state.0.get_node_indices();
     let mut map_sprites = Vec::new();
     let mut to_add_adjacencies = Vec::new();
-    let to_center_x = -MAP_FLOOR_SIZE.0 / 2.;
-    let to_center_y = -MAP_FLOOR_SIZE.1 / 2.;
+    let to_center_adjustment = get_to_center_adjustment();
     for node_index in node_indices {
         let room = map_state
             .0
@@ -69,7 +68,6 @@ fn initialize_map_system(
         let rect = room.rect;
         let room_type = room.room_type;
 
-        let to_center_adjustment = Vec2::new(to_center_x, to_center_y);
         let (front_rect, back_rect) = get_front_and_back_room_sprites(
             &mut commands,
             &mut meshes,
@@ -96,25 +94,6 @@ fn initialize_map_system(
         );
 
         map_sprites.push(room_type_sprite);
-
-        let player_rect = Rect::from_center_size(
-            map_state
-                .0
-                .get_player_location()
-                .expect("The player should have been instantiated already."),
-            Vec2::ONE * PLAYER_RECT_ON_MAP_SIZE,
-        );
-        let player_sprite = get_rect_sprite(
-            &mut commands,
-            &mut meshes,
-            &mut materials,
-            player_rect,
-            1.5,
-            to_center_adjustment,
-            Color::BLACK,
-        );
-
-        map_sprites.push(player_sprite);
     }
 
     to_add_adjacencies.iter().for_each(|(node_index, sprite)| {
@@ -143,7 +122,7 @@ fn initialize_map_system(
             &mut materials,
             rect,
             2.0,
-            Vec2::new(to_center_x, to_center_y),
+            to_center_adjustment,
             Color::WHITE,
         );
         map_sprites.push(door_sprite);
@@ -154,15 +133,39 @@ fn initialize_map_system(
 
 fn update_map_system(
     mut commands: Commands,
+    mut meshes: ResMut<Assets<Mesh>>,
     mut materials: ResMut<Assets<ColorMaterial>>,
-    mut player_sprite_query: Query<(Entity, &mut Transform), With<PlayerSpriteOnMap>>,
+    map_state: Res<MapState>,
+    player_sprite_query: Query<(Entity, &mut Transform), With<PlayerSpriteOnMap>>,
     hoverables_query: Query<
-        (Entity, &RaycastMesh<MouseoverRaycastSet>, &Transform),
+        (
+            Entity,
+            &RaycastMesh<MouseoverRaycastSet>,
+            &NodeIndexComponent,
+            &AdjacentRoomSprites,
+        ),
         Without<PlayerSpriteOnMap>,
     >,
-    player_room_query: Query<&AdjacentRoomSprites, With<ContainsPlayerComponent>>,
 ) {
-    let adjacent_rooms: HashSet<Entity> = player_room_query.single().0.clone();
+    let old_player_sprites: Vec<_> = player_sprite_query
+        .iter()
+        .map(|(entity, _)| entity)
+        .collect();
+    old_player_sprites
+        .into_iter()
+        .for_each(|e| commands.entity(e).despawn());
+
+    let player_node_index = map_state
+        .0
+        .get_player_room_index()
+        .expect("The player node should always be well defined.");
+
+    let (player_room_entity, adjacent_rooms) = hoverables_query
+        .iter()
+        .find(|(_, _, idx, _)| player_node_index == idx.0)
+        .map(|(entity, _, _, adjacent_rooms)| (entity, adjacent_rooms.0.clone()))
+        .expect("One of the hoverables is always the player room.");
+
     for entity in adjacent_rooms.iter() {
         commands
             .entity(*entity)
@@ -171,21 +174,33 @@ fn update_map_system(
 
     let maybe_hovered_room = hoverables_query
         .into_iter()
-        .filter(|(entity, raycast, _)| {
+        .filter(|(entity, raycast, _, _)| {
             raycast.intersections().len() > 0 && adjacent_rooms.contains(entity)
         })
         .next();
-    for (_, mut player_transform) in player_sprite_query.iter_mut() {
-        match maybe_hovered_room {
-            Some((_, _, transform)) => {
-                info!("Moving player transform.");
-                *player_transform = *transform;
-            }
-            None => {
-                // Do nothing
-            }
+    let hovered_player_room = match maybe_hovered_room {
+        Some((entity, _, _, _)) => {
+            info!("Moving player transform.");
+            entity
         }
-    }
+        None => player_room_entity,
+    };
+
+    let player_rect = Rect::from_center_size(Vec2::ZERO, Vec2::ONE * PLAYER_RECT_ON_MAP_SIZE);
+    let player_sprite = get_rect_sprite(
+        &mut commands,
+        &mut meshes,
+        &mut materials,
+        player_rect,
+        1.5,
+        Vec2::ZERO,
+        Color::BLACK,
+    );
+    commands.entity(player_sprite).insert(PlayerSpriteOnMap);
+
+    commands
+        .entity(hovered_player_room)
+        .add_child(player_sprite);
 }
 
 fn despawn_map_system(mut commands: Commands, map_sprites: Res<MapSprites>) {
@@ -327,6 +342,10 @@ impl Map {
 
     pub fn get_door_rects(&self) -> Vec<Rect> {
         self.adjacency_graph.get_door_rects()
+    }
+
+    pub fn get_player_room_index(&self) -> Option<NodeIndex> {
+        self.adjacency_graph.get_player_room_index()
     }
 
     pub fn get_player_location(&self) -> Option<Vec2> {
@@ -563,6 +582,16 @@ impl AdjacencyGraph {
                 Rect::from_corners(edge.weight - door_size / 2., edge.weight + door_size / 2.)
             })
             .collect()
+    }
+
+    pub fn get_player_room_index(&self) -> Option<NodeIndex> {
+        self.0.node_indices().find(|idx| {
+            self.0
+                .node_weight(*idx)
+                .expect("Index is guaranteed to exist.")
+                .explored_type
+                == ExploredType::CurrentlyExploring
+        })
     }
 
     pub fn get_player_location(&self) -> Option<Vec2> {
@@ -923,6 +952,13 @@ fn color_lerp(left: Color, right: Color, t: f32) -> Color {
         left.b() * (1. - t) + right.b() * t,
     )
 }
+
+fn get_to_center_adjustment() -> Vec2 {
+    let to_center_x = -MAP_FLOOR_SIZE.0 / 2.;
+    let to_center_y = -MAP_FLOOR_SIZE.1 / 2.;
+    Vec2::new(to_center_x, to_center_y)
+}
+
 //End Helper Functions
 
 #[cfg(test)]

@@ -136,7 +136,7 @@ fn update_map_system(
     mut meshes: ResMut<Assets<Mesh>>,
     mut materials: ResMut<Assets<ColorMaterial>>,
     map_state: Res<MapState>,
-    player_sprite_query: Query<(Entity, &mut Transform), With<PlayerSpriteOnMap>>,
+    player_sprite_query: Query<Entity, With<PlayerSpriteOnMap>>,
     hoverables_query: Query<
         (
             Entity,
@@ -147,10 +147,7 @@ fn update_map_system(
         Without<PlayerSpriteOnMap>,
     >,
 ) {
-    let old_player_sprites: Vec<_> = player_sprite_query
-        .iter()
-        .map(|(entity, _)| entity)
-        .collect();
+    let old_player_sprites: Vec<_> = player_sprite_query.iter().map(|entity| entity).collect();
     old_player_sprites
         .into_iter()
         .for_each(|e| commands.entity(e).despawn());

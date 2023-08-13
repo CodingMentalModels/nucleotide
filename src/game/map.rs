@@ -36,10 +36,14 @@ impl Plugin for MapPlugin {
             )
             .add_systems(
                 Update,
-                select_room_system.run_if(
-                    in_state(NucleotideState::SelectingRoom)
-                        .and_then(input_just_pressed(MouseButton::Left)),
-                ),
+                (
+                    select_room_system,
+                    update_room_visibility.after(select_room_system),
+                )
+                    .run_if(
+                        in_state(NucleotideState::SelectingRoom)
+                            .and_then(input_just_pressed(MouseButton::Left)),
+                    ),
             )
             .add_systems(OnExit(NucleotideState::SelectingRoom), despawn_map_system);
     }
@@ -101,6 +105,11 @@ fn initialize_map_system(
             to_center_adjustment,
             room_type.to_color(),
         );
+        commands
+            .entity(room_type_sprite)
+            .insert(NodeIndexComponent(node_index))
+            .insert(RoomTypeSpriteComponent)
+            .insert(room.get_visibility());
 
         map_sprites.push(room_type_sprite);
     }
@@ -223,11 +232,11 @@ fn select_room_system(
             &NodeIndexComponent,
             &RoomTypeComponent,
         ),
-        With<BackRoomComponent>,
+        With<BackRoomSpriteComponent>,
     >,
     front_room_query: Query<
         (Entity, &NodeIndexComponent, &mut Handle<ColorMaterial>),
-        With<FrontRoomComponent>,
+        With<FrontRoomSpriteComponent>,
     >,
 ) {
     let intersections = hoverable_query
@@ -277,6 +286,20 @@ fn select_room_system(
                 material_cache,
             ));
         }
+    }
+}
+
+fn update_room_visibility(
+    map_state: Res<MapState>,
+    mut query: Query<(&NodeIndexComponent, &mut Visibility), With<RoomTypeSpriteComponent>>,
+) {
+    info!("update_room_visibility");
+    for (node_index, mut visibility) in query.iter_mut() {
+        let room = map_state
+            .0
+            .get_room(node_index.0)
+            .expect("Room must exist for there to be a node index.");
+        *visibility = room.get_visibility();
     }
 }
 
@@ -363,10 +386,13 @@ pub struct MapSprites(Vec<Entity>);
 pub struct PlayerSpriteOnMap;
 
 #[derive(Debug, Clone, Component)]
-pub struct FrontRoomComponent;
+pub struct FrontRoomSpriteComponent;
 
 #[derive(Debug, Clone, Component)]
-pub struct BackRoomComponent;
+pub struct BackRoomSpriteComponent;
+
+#[derive(Debug, Clone, Component)]
+pub struct RoomTypeSpriteComponent;
 
 #[derive(Debug, Clone, Component)]
 pub struct NodeIndexComponent(NodeIndex);
@@ -902,7 +928,14 @@ impl Room {
             ExploredType::Unexplored => blueprint_gray,
             ExploredType::PreviouslyExplored => blueprint_blue,
             ExploredType::CurrentlyExploring => blueprint_blue,
-            ExploredType::Adjacent => blueprint_gray,
+        }
+    }
+
+    pub fn get_visibility(&self) -> Visibility {
+        match self.explored_type {
+            ExploredType::Unexplored => Visibility::Hidden,
+            ExploredType::PreviouslyExplored => Visibility::Visible,
+            ExploredType::CurrentlyExploring => Visibility::Visible,
         }
     }
 }
@@ -948,7 +981,6 @@ pub enum ExploredType {
     Unexplored,
     PreviouslyExplored,
     CurrentlyExploring,
-    Adjacent,
 }
 
 // End Helper Structs
@@ -990,7 +1022,7 @@ fn get_front_and_back_room_sprites(
     );
     commands
         .entity(back_sprite)
-        .insert(BackRoomComponent)
+        .insert(BackRoomSpriteComponent)
         .insert(NodeIndexComponent(node_index))
         .insert(RoomTypeComponent(room.room_type));
 
@@ -1010,7 +1042,7 @@ fn get_front_and_back_room_sprites(
     );
     commands
         .entity(front_sprite)
-        .insert(FrontRoomComponent)
+        .insert(FrontRoomSpriteComponent)
         .insert(NodeIndexComponent(node_index))
         .insert(RoomTypeComponent(room.room_type));
 

@@ -86,6 +86,10 @@ impl Plugin for BattlePlugin {
                 finished_handling_gene_system.run_if(in_state(NucleotideState::EndOfTurn)),
             )
             .add_systems(
+                OnEnter(NucleotideState::CharacterActing),
+                render_character_display_system,
+            )
+            .add_systems(
                 OnEnter(NucleotideState::GeneAnimating),
                 render_character_display_system,
             )

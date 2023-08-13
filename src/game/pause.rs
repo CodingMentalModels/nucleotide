@@ -45,12 +45,12 @@ fn pause_system(
     mut paused_state: ResMut<PausedState>,
 ) {
     for _ in pause_unpause_event_reader.iter() {
-        if current_state.0 == NucleotideState::Paused {
+        if current_state.get() == &NucleotideState::Paused {
             commands.insert_resource(NextState(Some(paused_state.0)));
         } else {
             paused_state.0 = match next_state.0 {
                 Some(state) => state,
-                None => current_state.0,
+                None => *current_state.get(),
             };
             commands.insert_resource(NextState(Some(NucleotideState::Paused)));
         }
@@ -58,4 +58,3 @@ fn pause_system(
 }
 
 // End Systems
-

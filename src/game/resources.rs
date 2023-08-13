@@ -1,4 +1,4 @@
-use std::collections::BTreeMap;
+use std::collections::{BTreeMap, HashMap};
 
 use bevy::prelude::*;
 
@@ -23,6 +23,8 @@ pub enum NucleotideState {
     Menu,
     Paused,
     InstantiatingMeta,
+    GeneratingMap,
+    SelectingRoom,
     Drafting,
     InitializingBattle,
     CharacterActing,
@@ -43,9 +45,9 @@ pub enum NucleotideState {
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash, Resource)]
-pub struct EnemyQueue(pub Vec<EnemyName>);
+pub struct EnemyPool(pub Vec<EnemyName>);
 
-impl EnemyQueue {
+impl EnemyPool {
     pub fn pop(&mut self) -> Option<EnemyName> {
         self.0.pop()
     }
@@ -284,3 +286,20 @@ impl GeneSpecLookup {
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash, Resource)]
 pub struct LoadedFont(pub Handle<Font>);
+
+#[derive(Debug, Clone, PartialEq, Eq, Hash, Resource)]
+pub struct MaterialCache(pub BTreeMap<u32, Handle<ColorMaterial>>);
+
+impl MaterialCache {
+    pub fn empty() -> Self {
+        Self(BTreeMap::new())
+    }
+
+    pub fn insert(&mut self, color: &Color, handle: Handle<ColorMaterial>) {
+        self.0.insert(color.as_rgba_u32(), handle);
+    }
+
+    pub fn get(&self, color: &Color) -> Option<Handle<ColorMaterial>> {
+        self.0.get(&color.as_rgba_u32()).cloned()
+    }
+}

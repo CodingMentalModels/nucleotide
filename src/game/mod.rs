@@ -3,6 +3,7 @@ pub mod battle;
 pub mod constants;
 pub mod events;
 pub mod input;
+pub mod map;
 pub mod meta;
 pub mod pause;
 pub mod resources;

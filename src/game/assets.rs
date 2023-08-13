@@ -14,10 +14,11 @@ pub struct AssetsPlugin;
 
 impl Plugin for AssetsPlugin {
     fn build(&self, app: &mut App) {
-        app.add_systems((
-            generate_example_specs_system.in_schedule(OnEnter(NucleotideState::LoadingAssets)),
-            load_assets_system.in_schedule(OnEnter(NucleotideState::LoadingAssets)),
-        ));
+        app.add_systems(
+            OnEnter(NucleotideState::LoadingAssets),
+            generate_example_specs_system,
+        )
+        .add_systems(OnEnter(NucleotideState::LoadingAssets), load_assets_system);
     }
 }
 
@@ -127,4 +128,3 @@ fn read_files_from_directory(directory: &Path) -> Vec<String> {
 }
 
 // End Helper Functions
-

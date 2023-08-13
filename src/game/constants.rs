@@ -16,6 +16,22 @@ pub const LOG_WINDOW_SIZE: (f32, f32) = (300.0, 300.0);
 pub const LOG_TEXT_SIZE: f32 = 20.;
 pub const MAX_ACTION_BUTTONS: usize = 4;
 
+// Map
+pub const MAP_FLOOR_SIZE: (f32, f32) = (700., 400.);
+pub const N_ROOMS_PER_FLOOR: usize = 12;
+pub const MIN_ROOM_SIZE: f32 = 20.;
+pub const ROOM_TYPE_RECT_SIZE: f32 = 10.;
+pub const PLAYER_RECT_ON_MAP_SIZE: f32 = 20.;
+pub const MAP_WALLS_VERTICAL_PROPORTION: f64 = 0.5;
+pub const MAX_MAP_GENERATION_ITERATIONS: usize = 100;
+pub const WALL_WIDTH: f32 = 1.;
+pub const DOOR_SIZE: (f32, f32) = (5., 5.);
+pub const EMPTY_ROOM_WEIGHT: f32 = 1.0;
+pub const COMBAT_ROOM_WEIGHT: f32 = 1.0;
+
+// Colors
+pub const BLUEPRINT_BLUE: (f32, f32, f32) = (0.25, 0.25, 0.75);
+
 // Greek Letters
 pub const ALPHA_LOWER: char = 'α';
 pub const ALPHA_UPPER: char = 'Α';

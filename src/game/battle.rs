@@ -32,36 +32,75 @@ impl Plugin for BattlePlugin {
             .add_event::<GeneProcessingEvent>()
             .add_event::<StatusEffectEvent>()
             .add_event::<BattleActionEvent>()
-            .add_systems((
-                initialize_battle_system.in_schedule(OnEnter(NucleotideState::InitializingBattle)),
-                character_acting_system.in_schedule(OnEnter(NucleotideState::CharacterActing)),
-                fetch_battle_actions_system
-                    .in_schedule(OnEnter(NucleotideState::AwaitingBattleInput)),
+            .add_systems(
+                OnEnter(NucleotideState::InitializingBattle),
+                initialize_battle_system,
+            )
+            .add_systems(
+                OnEnter(NucleotideState::CharacterActing),
+                character_acting_system,
+            )
+            .add_systems(
+                OnEnter(NucleotideState::AwaitingBattleInput),
+                fetch_battle_actions_system,
+            )
+            .add_systems(
+                Update,
                 handle_battle_actions_system.run_if(in_state(NucleotideState::AwaitingBattleInput)),
-                handle_start_of_turn_statuses_system
-                    .in_schedule(OnEnter(NucleotideState::StartOfTurn)),
-                gene_loading_system.in_schedule(OnEnter(NucleotideState::GeneLoading)),
-                handle_gene_commands_system
-                    .in_schedule(OnEnter(NucleotideState::GeneCommandHandling)),
-            ))
-            .add_systems((
+            )
+            .add_systems(
+                OnEnter(NucleotideState::StartOfTurn),
+                handle_start_of_turn_statuses_system,
+            )
+            .add_systems(OnEnter(NucleotideState::GeneLoading), gene_loading_system)
+            .add_systems(
+                OnEnter(NucleotideState::GeneCommandHandling),
+                handle_gene_commands_system,
+            )
+            .add_systems(
+                Update,
                 handle_ran_away_system.run_if(get_event_handling_system_condition()),
+            )
+            .add_systems(
+                Update,
                 handle_damage_system.run_if(get_event_handling_system_condition()),
+            )
+            .add_systems(
+                Update,
                 update_block_system.run_if(get_event_handling_system_condition()),
-            ))
-            .add_systems((
-                // Need multiple calls to add_systems in order to satisfy the trait
-                // requirements
+            )
+            .add_systems(
+                Update,
                 update_gene_processing_system.run_if(get_event_handling_system_condition()),
+            )
+            .add_systems(
+                Update,
                 apply_status_effect_system.run_if(in_state(NucleotideState::GeneCommandHandling)),
-                handle_end_of_turn_statuses_system.in_schedule(OnEnter(NucleotideState::EndOfTurn)),
+            )
+            .add_systems(
+                OnEnter(NucleotideState::EndOfTurn),
+                handle_end_of_turn_statuses_system,
+            )
+            .add_systems(
+                Update,
                 finished_handling_gene_system.run_if(in_state(NucleotideState::EndOfTurn)),
-                render_character_display_system
-                    .in_schedule(OnEnter(NucleotideState::GeneAnimating)),
-                render_genome_system.in_schedule(OnEnter(NucleotideState::GeneAnimating)),
+            )
+            .add_systems(
+                OnEnter(NucleotideState::GeneAnimating),
+                render_character_display_system,
+            )
+            .add_systems(
+                OnEnter(NucleotideState::GeneAnimating),
+                render_genome_system,
+            )
+            .add_systems(
+                Update,
                 finished_animating_gene_system.run_if(in_state(NucleotideState::GeneAnimating)),
-                clean_up_after_battle.in_schedule(OnEnter(NucleotideState::SelectBattleReward)),
-            ));
+            )
+            .add_systems(
+                OnEnter(NucleotideState::SelectBattleReward),
+                clean_up_after_battle,
+            );
     }
 }
 
@@ -111,22 +150,22 @@ impl LogState {
 // End Resources
 
 // Events
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Event)]
 struct RanAwayEvent(Entity);
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Event)]
 struct DamageEvent(TargetEntity, u8);
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Event)]
 struct BlockEvent(TargetEntity, u8);
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Event)]
 struct GeneProcessingEvent(TargetEntity, GeneProcessingEventType);
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Event)]
 struct StatusEffectEvent(TargetEntity, StatusEffect, u8);
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Event)]
 enum GeneProcessingEventType {
     Reverse,
 }
@@ -140,7 +179,7 @@ fn initialize_battle_system(
     enemy_specs: Res<EnemySpecs>,
     gene_specs: Res<GeneSpecs>,
     player: Res<Player>,
-    mut enemy_queue: ResMut<EnemyQueue>,
+    mut enemy_queue: ResMut<EnemyPool>,
     current_state: Res<State<NucleotideState>>,
     mut next_state: ResMut<NextState<NucleotideState>>,
 ) {
@@ -172,7 +211,7 @@ fn initialize_battle_system(
     commands.insert_resource(CharacterTypeToEntity(character_type_to_entity));
 
     queue_next_state_if_not_already_queued(
-        current_state.0,
+        *current_state.get(),
         &mut next_state,
         NucleotideState::CharacterActing,
     );
@@ -209,7 +248,7 @@ fn character_acting_system(
     energy.energy_remaining -= 1;
 
     queue_next_state_if_not_already_queued(
-        current_state.0,
+        *current_state.get(),
         &mut next_state,
         NucleotideState::AwaitingBattleInput,
     );
@@ -248,7 +287,7 @@ fn handle_battle_actions_system(
             }
         }
         queue_next_state_if_not_already_queued(
-            current_state.0,
+            *current_state.get(),
             &mut next_state,
             NucleotideState::StartOfTurn,
         );
@@ -274,7 +313,7 @@ fn handle_start_of_turn_statuses_system(
     );
 
     queue_next_state_if_not_already_queued(
-        current_state.0,
+        *current_state.get(),
         &mut next_state,
         NucleotideState::GeneLoading,
     );
@@ -327,7 +366,7 @@ fn gene_loading_system(
     }
 
     queue_next_state_if_not_already_queued(
-        current_state.0,
+        *current_state.get(),
         &mut next_state,
         NucleotideState::GeneCommandHandling,
     );
@@ -378,7 +417,7 @@ fn handle_gene_commands_system(
     gene_command_queue.0.clear();
 
     queue_next_state_if_not_already_queued(
-        current_state.0,
+        *current_state.get(),
         &mut next_state,
         NucleotideState::EndOfTurn,
     );
@@ -395,7 +434,7 @@ fn handle_ran_away_system(
         if character_type_to_entity_map.is_player(entity.0) {
             *battle_reward_ui_state = SelectBattleRewardUIState::after_running_away();
             force_next_state(
-                current_state.0,
+                *current_state.get(),
                 &mut next_state,
                 NucleotideState::SelectBattleReward,
             );
@@ -420,7 +459,7 @@ fn handle_damage_system(
             if health.0 == 0 {
                 match character_type_to_entity.get_character_type(entity) {
                     CharacterType::Player => force_next_state(
-                        current_state.0,
+                        *current_state.get(),
                         &mut next_state,
                         NucleotideState::GameOver,
                     ),
@@ -430,7 +469,7 @@ fn handle_damage_system(
                         force_next_state(
                             // TODO: This doesn't handle multiple enemies at all -- if one dies, battle
                             // over
-                            current_state.0,
+                            *current_state.get(),
                             &mut next_state,
                             NucleotideState::SelectBattleReward,
                         );
@@ -510,7 +549,7 @@ fn finished_handling_gene_system(
     }
 
     queue_next_state_if_not_already_queued(
-        current_state.0,
+        *current_state.get(),
         &mut next_state,
         NucleotideState::GeneAnimating,
     );
@@ -571,7 +610,7 @@ fn finished_animating_gene_system(
     mut next_state: ResMut<NextState<NucleotideState>>,
 ) {
     queue_next_state_if_not_already_queued(
-        current_state.0,
+        *current_state.get(),
         &mut next_state,
         NucleotideState::CharacterActing,
     );

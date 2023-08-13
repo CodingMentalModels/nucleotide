@@ -210,7 +210,7 @@ fn render_select_gene_from_enemy_system(
         );
         let gene = enemy_genome[i].clone();
         player.add_gene(gene.clone());
-        commands.insert_resource(NextState(Some(NucleotideState::InitializingBattle)));
+        commands.insert_resource(NextState(Some(NucleotideState::SelectingRoom)));
     };
     render_options(&mut contexts, heading, options, on_click, Vec::new());
 }
@@ -238,10 +238,9 @@ fn render_move_gene(
             );
         }
         MoveGeneUIState::SecondSelection(first_selection_index) => {
-            // This is broken because the string is what gets returned and that's not a gene
             let on_click = |i: usize| {
                 player.move_gene(first_selection_index, i);
-                commands.insert_resource(NextState(Some(NucleotideState::InitializingBattle)));
+                commands.insert_resource(NextState(Some(NucleotideState::SelectingRoom)));
             };
             let mut options = vec!["At the Beginning".to_string()];
             genome.remove(first_selection_index);
@@ -288,7 +287,7 @@ fn render_swap_genes(
             let on_click = |i: usize| {
                 assert!(i < genome.len(), "The gene is guaranteed to be there.");
                 player.swap_genes(first_selection_index, i);
-                commands.insert_resource(NextState(Some(NucleotideState::InitializingBattle)));
+                commands.insert_resource(NextState(Some(NucleotideState::SelectingRoom)));
             };
             render_options(
                 &mut contexts,

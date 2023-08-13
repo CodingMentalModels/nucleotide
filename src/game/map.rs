@@ -18,8 +18,6 @@ use crate::game::constants::*;
 use crate::game::input::MouseoverRaycastSet;
 use crate::game::resources::*;
 
-type XCoordinate = u32;
-type YCoordinate = u32;
 type DoorPosition = Vec2;
 type InternalGraph = UnGraph<Room, DoorPosition>;
 

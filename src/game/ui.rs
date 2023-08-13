@@ -77,6 +77,7 @@ impl Plugin for UIPlugin {
                 render_swap_genes.run_if(in_state(NucleotideState::SwapGenes)),
             );
 
+        app.insert_resource(MaterialCache::empty());
         app.insert_resource(InitializingBattleUIState::default());
         app.insert_resource(InBattleUIState::from_state(
             NucleotideState::CharacterActing,

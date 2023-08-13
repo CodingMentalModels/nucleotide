@@ -38,7 +38,10 @@ impl Plugin for MapPlugin {
             )
             .add_systems(
                 Update,
-                handle_click_system.run_if(input_just_pressed(MouseButton::Left)),
+                handle_click_system.run_if(
+                    in_state(NucleotideState::SelectingRoom)
+                        .and_then(input_just_pressed(MouseButton::Left)),
+                ),
             )
             .add_systems(OnExit(NucleotideState::SelectingRoom), despawn_map_system);
     }
@@ -59,6 +62,7 @@ fn initialize_map_system(
     mut commands: Commands,
     mut meshes: ResMut<Assets<Mesh>>,
     mut materials: ResMut<Assets<ColorMaterial>>,
+    mut material_cache: ResMut<MaterialCache>,
     map_state: Res<MapState>,
 ) {
     let node_indices = map_state.0.get_node_indices();
@@ -77,6 +81,7 @@ fn initialize_map_system(
             &mut commands,
             &mut meshes,
             &mut materials,
+            &mut material_cache,
             room,
             to_center_adjustment,
             node_index,
@@ -92,6 +97,7 @@ fn initialize_map_system(
             &mut commands,
             &mut meshes,
             &mut materials,
+            &mut material_cache,
             room_type_rect,
             2.0,
             to_center_adjustment,
@@ -125,6 +131,7 @@ fn initialize_map_system(
             &mut commands,
             &mut meshes,
             &mut materials,
+            &mut material_cache,
             rect,
             2.0,
             to_center_adjustment,
@@ -140,6 +147,7 @@ fn update_map_system(
     mut commands: Commands,
     mut meshes: ResMut<Assets<Mesh>>,
     mut materials: ResMut<Assets<ColorMaterial>>,
+    mut material_cache: ResMut<MaterialCache>,
     map_state: Res<MapState>,
     player_sprite_query: Query<Entity, With<PlayerSpriteOnMap>>,
     hoverables_query: Query<
@@ -169,9 +177,11 @@ fn update_map_system(
         .expect("One of the hoverables is always the player room.");
 
     for entity in adjacent_rooms.iter() {
-        commands
-            .entity(*entity)
-            .insert(materials.add(ColorMaterial::from(Color::GREEN)));
+        commands.entity(*entity).insert(get_or_insert_material(
+            Color::GREEN,
+            &mut *materials,
+            &mut *material_cache,
+        ));
     }
 
     let maybe_hovered_room = hoverables_query
@@ -190,6 +200,7 @@ fn update_map_system(
         &mut commands,
         &mut meshes,
         &mut materials,
+        &mut material_cache,
         player_rect,
         1.5,
         Vec2::ZERO,
@@ -205,6 +216,8 @@ fn update_map_system(
 fn handle_click_system(
     mut commands: Commands,
     mut map_state: ResMut<MapState>,
+    mut materials: ResMut<Assets<ColorMaterial>>,
+    mut material_cache: ResMut<MaterialCache>,
     hoverable_query: Query<
         (
             Entity,
@@ -214,7 +227,10 @@ fn handle_click_system(
         ),
         With<BackRoomComponent>,
     >,
-    front_room_query: Query<(Entity, &mut Handle<ColorMaterial>), With<FrontRoomComponent>>,
+    front_room_query: Query<
+        (Entity, &NodeIndexComponent, &mut Handle<ColorMaterial>),
+        With<FrontRoomComponent>,
+    >,
 ) {
     info!("Click!");
     let intersections = hoverable_query
@@ -246,7 +262,20 @@ fn handle_click_system(
         }
     }
 
-    front_room_query.for_each(|e| commands.entity(e))
+    let materials_ref: &mut Assets<ColorMaterial> = &mut materials;
+    let material_cache: &mut MaterialCache = &mut material_cache;
+
+    for (e, node_index, previous_color) in front_room_query.iter() {
+        commands.entity(e).insert(get_or_insert_material(
+            map_state
+                .0
+                .get_room(node_index.0)
+                .expect("The room must exist for the node_index to exist")
+                .to_color(),
+            materials_ref,
+            material_cache,
+        ));
+    }
 }
 
 fn despawn_map_system(mut commands: Commands, map_sprites: Res<MapSprites>) {
@@ -864,7 +893,7 @@ impl Room {
         self.explored_type == ExploredType::CurrentlyExploring
     }
 
-    pub fn get_color(&self) -> Color {
+    pub fn to_color(&self) -> Color {
         let blueprint_blue = Color::rgb(BLUEPRINT_BLUE.0, BLUEPRINT_BLUE.1, BLUEPRINT_BLUE.2);
         let blueprint_gray = color_lerp(blueprint_blue, get_grayscale(blueprint_blue), 0.75);
         match self.explored_type {
@@ -940,16 +969,18 @@ fn get_front_and_back_room_sprites(
     commands: &mut Commands,
     meshes: &mut Assets<Mesh>,
     materials: &mut Assets<ColorMaterial>,
+    material_cache: &mut MaterialCache,
     room: Room,
     global_translation: Vec2,
     node_index: NodeIndex,
 ) -> (Entity, Entity) {
     let rect = room.rect;
-    let background_color = room.get_color();
+    let background_color = room.to_color();
     let back_sprite = get_rect_sprite(
         commands,
         meshes,
         materials,
+        material_cache,
         rect,
         0.,
         global_translation,
@@ -957,7 +988,7 @@ fn get_front_and_back_room_sprites(
     );
     commands
         .entity(back_sprite)
-        .insert(BackRoomSpriteComponent)
+        .insert(BackRoomComponent)
         .insert(NodeIndexComponent(node_index))
         .insert(RoomTypeComponent(room.room_type));
 
@@ -969,6 +1000,7 @@ fn get_front_and_back_room_sprites(
         commands,
         meshes,
         materials,
+        material_cache,
         front_rect,
         1.,
         global_translation,
@@ -976,7 +1008,7 @@ fn get_front_and_back_room_sprites(
     );
     commands
         .entity(front_sprite)
-        .insert(FrontRoomSpriteComponent)
+        .insert(FrontRoomComponent)
         .insert(NodeIndexComponent(node_index))
         .insert(RoomTypeComponent(room.room_type));
 
@@ -994,6 +1026,7 @@ fn get_rect_sprite(
     commands: &mut Commands,
     meshes: &mut Assets<Mesh>,
     materials: &mut Assets<ColorMaterial>,
+    material_cache: &mut MaterialCache,
     rect: Rect,
     z_value: f32,
     global_translation: Vec2,
@@ -1005,7 +1038,7 @@ fn get_rect_sprite(
             transform: Transform::from_translation(
                 rect.center().extend(z_value) + global_translation.extend(0.),
             ),
-            material: materials.add(ColorMaterial::from(color)),
+            material: get_or_insert_material(color, &mut *materials, &mut *material_cache),
             ..default()
         })
         .insert(RaycastMesh::<MouseoverRaycastSet>::default())
@@ -1040,6 +1073,19 @@ fn get_to_center_adjustment() -> Vec2 {
     Vec2::new(to_center_x, to_center_y)
 }
 
+fn get_or_insert_material(
+    color: Color,
+    materials: &mut Assets<ColorMaterial>,
+    cache: &mut MaterialCache,
+) -> Handle<ColorMaterial> {
+    if let Some(handle) = cache.get(&color) {
+        return handle.clone();
+    }
+
+    let handle = materials.add(color.into());
+    cache.insert(&color, handle.clone());
+    handle
+}
 //End Helper Functions
 
 #[cfg(test)]

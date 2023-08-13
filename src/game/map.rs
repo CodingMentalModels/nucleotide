@@ -232,13 +232,11 @@ fn select_room_system(
         With<FrontRoomComponent>,
     >,
 ) {
-    info!("Click!");
     let intersections = hoverable_query
         .iter()
         .filter(|(_, raycast, _, _)| raycast.intersections().len() == 1)
         .collect::<Vec<_>>();
     if intersections.len() != 1 {
-        info!("Multiple hoverables: {:?}", hoverable_query);
         return;
     }
 
@@ -246,11 +244,6 @@ fn select_room_system(
         .into_iter()
         .next()
         .expect("We just confirmed there was exactly 1.");
-
-    info!(
-        "Updating player node to {:?} ({:?})",
-        new_room_node_index, room_type
-    );
 
     let player_adjacent_rooms = map_state.0.get_adjacent_node_indices(
         map_state

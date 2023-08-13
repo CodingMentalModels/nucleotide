@@ -38,7 +38,7 @@ impl Plugin for MapPlugin {
             )
             .add_systems(
                 Update,
-                handle_click_system.run_if(
+                select_room_system.run_if(
                     in_state(NucleotideState::SelectingRoom)
                         .and_then(input_just_pressed(MouseButton::Left)),
                 ),
@@ -213,7 +213,7 @@ fn update_map_system(
         .add_child(player_sprite);
 }
 
-fn handle_click_system(
+fn select_room_system(
     mut commands: Commands,
     mut map_state: ResMut<MapState>,
     mut materials: ResMut<Assets<ColorMaterial>>,
@@ -252,29 +252,40 @@ fn handle_click_system(
         new_room_node_index, room_type
     );
 
-    map_state.0.update_player_node(new_room_node_index.0);
-    match room_type.0 {
-        RoomType::Combat => {
-            commands.insert_resource(NextState(Some(NucleotideState::InitializingBattle)));
+    let player_adjacent_rooms = map_state.0.get_adjacent_node_indices(
+        map_state
+            .0
+            .get_player_room_index()
+            .expect("The player must exist on the map by this point."),
+    );
+    if !player_adjacent_rooms.contains(&new_room_node_index.0) {
+        // We don't want to update anything -- it's not a room we can travel to
+        return;
+    } else {
+        map_state.0.update_player_node(new_room_node_index.0);
+        match room_type.0 {
+            RoomType::Combat => {
+                commands.insert_resource(NextState(Some(NucleotideState::InitializingBattle)));
+            }
+            _ => {
+                // Do nothing
+            }
         }
-        _ => {
-            // Do nothing
+
+        let materials_ref: &mut Assets<ColorMaterial> = &mut materials;
+        let material_cache: &mut MaterialCache = &mut material_cache;
+
+        for (e, node_index, previous_color) in front_room_query.iter() {
+            commands.entity(e).insert(get_or_insert_material(
+                map_state
+                    .0
+                    .get_room(node_index.0)
+                    .expect("The room must exist for the node_index to exist")
+                    .to_color(),
+                materials_ref,
+                material_cache,
+            ));
         }
-    }
-
-    let materials_ref: &mut Assets<ColorMaterial> = &mut materials;
-    let material_cache: &mut MaterialCache = &mut material_cache;
-
-    for (e, node_index, previous_color) in front_room_query.iter() {
-        commands.entity(e).insert(get_or_insert_material(
-            map_state
-                .0
-                .get_room(node_index.0)
-                .expect("The room must exist for the node_index to exist")
-                .to_color(),
-            materials_ref,
-            material_cache,
-        ));
     }
 }
 

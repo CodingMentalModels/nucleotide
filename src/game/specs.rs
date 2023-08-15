@@ -117,6 +117,16 @@ impl StatusEffect {
         }
     }
 
+    pub fn applies_only_on_turn(&self) -> bool {
+        match self {
+            StatusEffect::RunningAway => true,
+            StatusEffect::Poison => false,
+            StatusEffect::Weak => true,
+            StatusEffect::Constricted => true,
+            StatusEffect::RepeatGene => true,
+        }
+    }
+
     pub fn to_string(&self) -> String {
         match self {
             StatusEffect::RunningAway => "Running Away",

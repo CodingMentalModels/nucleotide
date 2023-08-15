@@ -887,7 +887,7 @@ fn handle_statuses(
         status_effect
             .0
             .retain_mut(|(status_effect_type, n_stacks)| {
-                if character_acting.0 != entity {
+                if status_effect_type.applies_only_on_turn() && (character_acting.0 != entity) {
                     return true;
                 }
                 if status_effect_type.get_activation_timing() != activation_timing {

@@ -267,10 +267,12 @@ fn fetch_battle_actions_system(
     let not_players_turn = !character_type_to_entity_map.is_player(character_acting.0);
     let is_running = status_query.single().0.contains(&StatusEffect::RunningAway);
 
-    if not_players_turn || is_running {
+    if not_players_turn {
         battle_actions.0 = vec![BattleActionEvent::Continue];
+    } else if is_running {
+        battle_actions.0 = vec![BattleActionEvent::ExpressGene];
     } else {
-        battle_actions.0 = vec![BattleActionEvent::Continue, BattleActionEvent::RunAway];
+        battle_actions.0 = BattleActionEvent::all_player_actions();
     }
 }
 
@@ -283,11 +285,15 @@ fn handle_battle_actions_system(
 ) {
     for event in battle_action_event_reader.iter() {
         match event {
-            BattleActionEvent::Continue => {}
+            BattleActionEvent::Continue | BattleActionEvent::ExpressGene => {}
             BattleActionEvent::RunAway => {
                 let mut status_effects = player_query.single_mut();
                 status_effects.add(StatusEffect::RunningAway, ENERGY_COST_TO_RUN_AWAY);
                 log.log_string("Running away!".to_string());
+            }
+            BattleActionEvent::Skip => {
+                let mut status_effects = player_query.single_mut();
+                status_effects.add(StatusEffect::Skipping, 1);
             }
         }
         queue_next_state_if_not_already_queued(
@@ -337,6 +343,8 @@ fn gene_loading_system(
 
     if status_effects.contains(&StatusEffect::RunningAway) {
         log.log_string("Trying to run away.".to_string());
+    } else if status_effects.contains(&StatusEffect::Skipping) {
+        log.log_string("Skipping gene.".to_string())
     } else {
         let gene = genome.get_active_gene();
 
@@ -894,6 +902,9 @@ fn handle_statuses(
                     return true;
                 }
                 match status_effect_type {
+                    StatusEffect::Skipping => {
+                        *n_stacks -= 1;
+                    }
                     StatusEffect::RunningAway => {
                         *n_stacks -= 1;
                         if n_stacks == &mut 0 {

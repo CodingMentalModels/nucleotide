@@ -287,17 +287,16 @@ As a v0, implement via colored rectangles
 [ ] Take Off
 [ ] Leap
 [ ] Hop
-[ ] Run -- 100% Chance to excape the fight, but gain no rewards
+[ ] Run -- 100% Chance to escape the fight, but gain no rewards
 [ ] Bioluminescence
 [ ] Regenerate
 [ ] Mimic -- Perform the last ability that the target performed
-[ ] 
 
 
 #### Transcription
 [x] Reverse
 [ ] Skip
-[ ] Repeat
+[x] Repeat
 [ ] ATP50 -- Get more energy
 
 #### Potions

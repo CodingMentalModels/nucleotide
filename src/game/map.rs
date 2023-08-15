@@ -244,10 +244,7 @@ fn select_room_system(
         ),
         With<BackRoomSpriteComponent>,
     >,
-    front_room_query: Query<
-        (Entity, &NodeIndexComponent, &mut Handle<ColorMaterial>),
-        With<FrontRoomSpriteComponent>,
-    >,
+    front_room_query: Query<(Entity, &NodeIndexComponent), With<FrontRoomSpriteComponent>>,
 ) {
     let intersections = hoverable_query
         .iter()
@@ -285,7 +282,7 @@ fn select_room_system(
         let materials_ref: &mut Assets<ColorMaterial> = &mut materials;
         let material_cache: &mut MaterialCache = &mut material_cache;
 
-        for (e, node_index, previous_color) in front_room_query.iter() {
+        for (e, node_index) in front_room_query.iter() {
             commands.entity(e).insert(get_or_insert_material(
                 map_state
                     .0
@@ -303,7 +300,6 @@ fn update_room_visibility(
     map_state: Res<MapState>,
     mut query: Query<(&NodeIndexComponent, &mut Visibility), With<RoomTypeSpriteComponent>>,
 ) {
-    info!("update_room_visibility");
     for (node_index, mut visibility) in query.iter_mut() {
         let room = map_state
             .0

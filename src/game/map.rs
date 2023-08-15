@@ -45,7 +45,17 @@ impl Plugin for MapPlugin {
                             .and_then(input_just_pressed(MouseButton::Left)),
                     ),
             )
-            .add_systems(OnExit(NucleotideState::SelectingRoom), despawn_map_system);
+            .add_systems(OnExit(NucleotideState::SelectingRoom), despawn_map_system)
+            .add_systems(
+                OnExit(NucleotideState::SelectGeneFromEnemy),
+                remove_combat_from_map,
+            )
+            .add_systems(OnExit(NucleotideState::MoveGene), remove_combat_from_map)
+            .add_systems(OnExit(NucleotideState::SwapGenes), remove_combat_from_map)
+            .add_systems(
+                OnExit(NucleotideState::ResearchGene),
+                remove_combat_from_map,
+            );
     }
 }
 
@@ -309,11 +319,14 @@ fn despawn_map_system(mut commands: Commands, map_sprites: Res<MapSprites>) {
     }
 }
 
+fn remove_combat_from_map(mut map_state: ResMut<MapState>) {
+    map_state.0.clear_player_room();
+}
 // End Systems
 
 // Resources
 #[derive(Debug, Clone, Resource)]
-pub struct MapState(Map);
+pub struct MapState(pub Map);
 
 impl Default for MapState {
     fn default() -> Self {
@@ -452,6 +465,10 @@ impl Map {
 
     pub fn get_door_rects(&self) -> Vec<Rect> {
         self.adjacency_graph.get_door_rects()
+    }
+
+    pub fn clear_player_room(&mut self) {
+        self.adjacency_graph.clear_player_room();
     }
 
     pub fn update_player_node(&mut self, node_index: NodeIndex) {
@@ -696,6 +713,21 @@ impl AdjacencyGraph {
                 Rect::from_corners(edge.weight - door_size / 2., edge.weight + door_size / 2.)
             })
             .collect()
+    }
+
+    pub fn clear_player_room(&mut self) {
+        match self.get_player_room_index() {
+            Some(idx) => {
+                let mut room = self
+                    .0
+                    .node_weight_mut(idx)
+                    .expect("The player room has to exist at the index where it was found.");
+                room.room_type = RoomType::Empty;
+            }
+            None => {
+                info!("Tried to clear player room but there wasn't one.");
+            }
+        }
     }
 
     pub fn update_player_node(&mut self, node_index: NodeIndex) {

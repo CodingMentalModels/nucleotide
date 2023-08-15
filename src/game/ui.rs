@@ -10,9 +10,11 @@ use crate::game::resources::*;
 
 use super::battle::{GenomeComponent, LogState};
 use super::events::BattleActionEvent;
+use super::map::MapState;
 use super::ui_state::{
     CharacterUIState, GameOverUIState, GenomeUIState, InBattleUIState, MoveGeneUIState,
-    PausedUIState, SelectBattleRewardUIState, SwapGenesUIState, VictoryUIState,
+    PausedUIState, ResearchGeneUIState, SelectBattleRewardUIState, SwapGenesUIState,
+    VictoryUIState,
 };
 use super::ui_state::{InitializingBattleUIState, SelectGeneFromEnemyUIState};
 
@@ -75,6 +77,10 @@ impl Plugin for UIPlugin {
             .add_systems(
                 Update,
                 render_swap_genes.run_if(in_state(NucleotideState::SwapGenes)),
+            )
+            .add_systems(
+                Update,
+                render_research_gene.run_if(in_state(NucleotideState::ResearchGene)),
             );
 
         app.insert_resource(MaterialCache::empty());
@@ -87,6 +93,7 @@ impl Plugin for UIPlugin {
         app.insert_resource(SelectGeneFromEnemyUIState::default());
         app.insert_resource(MoveGeneUIState::default());
         app.insert_resource(SwapGenesUIState::default());
+        app.insert_resource(ResearchGeneUIState::default());
         app.insert_resource(GameOverUIState::default());
         app.insert_resource(VictoryUIState::default());
     }
@@ -297,6 +304,14 @@ fn render_swap_genes(
             );
         }
     }
+}
+
+fn render_research_gene(
+    mut commands: Commands,
+    mut ui_state: ResMut<ResearchGeneUIState>,
+    mut contexts: EguiContexts,
+) {
+    panic!("Not implemented!");
 }
 
 fn render_initializing_battle_system(mut contexts: EguiContexts) {

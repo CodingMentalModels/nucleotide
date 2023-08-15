@@ -163,10 +163,7 @@ impl SelectBattleRewardUIState {
             ),
             ("Move a Gene".to_string(), NucleotideState::MoveGene),
             ("Swap two Genes".to_string(), NucleotideState::SwapGenes),
-            (
-                "Research a Gene".to_string(),
-                NucleotideState::InitializingBattle,
-            ),
+            ("Research a Gene".to_string(), NucleotideState::ResearchGene),
         ])
     }
 }
@@ -186,6 +183,9 @@ pub enum SwapGenesUIState {
     FirstSelection,
     SecondSelection(usize),
 }
+
+#[derive(Debug, Default, Clone, PartialEq, Eq, Hash, Resource)]
+pub struct ResearchGeneUIState;
 
 #[derive(Debug, Default, Clone, PartialEq, Eq, Hash, Resource)]
 pub struct GameOverUIState;

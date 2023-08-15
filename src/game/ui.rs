@@ -197,7 +197,6 @@ fn render_select_reward_system(
 
 fn render_select_gene_from_enemy_system(
     mut commands: Commands,
-    ui_state: Res<SelectGeneFromEnemyUIState>,
     mut contexts: EguiContexts,
     mut player: ResMut<Player>,
     enemy_specs: Res<EnemySpecs>,
@@ -227,14 +226,13 @@ fn render_move_gene(
     mut ui_state: ResMut<MoveGeneUIState>,
     mut contexts: EguiContexts,
     mut player: ResMut<Player>,
-    character_type_to_entity: Res<CharacterTypeToEntity>,
 ) {
     let mut genome = player.get_genome();
     match *ui_state {
         MoveGeneUIState::FirstSelection => {
             let on_click = |i: usize| {
                 assert!(i < genome.len(), "The gene is guaranteed to be there.");
-                *ui_state = MoveGeneUIState::SecondSelection(i)
+                *ui_state = MoveGeneUIState::SecondSelection(i);
             };
             render_options(
                 &mut contexts,
@@ -247,6 +245,7 @@ fn render_move_gene(
         MoveGeneUIState::SecondSelection(first_selection_index) => {
             let on_click = |i: usize| {
                 player.move_gene(first_selection_index, i);
+                *ui_state = MoveGeneUIState::default();
                 commands.insert_resource(NextState(Some(NucleotideState::SelectingRoom)));
             };
             let mut options = vec!["At the Beginning".to_string()];
@@ -273,7 +272,6 @@ fn render_swap_genes(
     mut ui_state: ResMut<SwapGenesUIState>,
     mut contexts: EguiContexts,
     mut player: ResMut<Player>,
-    character_type_to_entity: Res<CharacterTypeToEntity>,
 ) {
     let genome = player.get_genome();
     match *ui_state {
@@ -294,6 +292,7 @@ fn render_swap_genes(
             let on_click = |i: usize| {
                 assert!(i < genome.len(), "The gene is guaranteed to be there.");
                 player.swap_genes(first_selection_index, i);
+                *ui_state = SwapGenesUIState::default();
                 commands.insert_resource(NextState(Some(NucleotideState::SelectingRoom)));
             };
             render_options(
@@ -315,10 +314,7 @@ fn render_research_gene(
     panic!("Not implemented!");
 }
 
-fn render_initializing_battle_system(
-    ui_state: Res<InitializingBattleUIState>,
-    mut contexts: EguiContexts,
-) {
+fn render_initializing_battle_system(mut contexts: EguiContexts) {
     egui::Area::new("initiazing-battle-screen")
         .anchor(egui::Align2::CENTER_CENTER, egui::Vec2::ZERO)
         .show(contexts.ctx_mut(), |ui| {

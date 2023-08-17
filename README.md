@@ -246,11 +246,12 @@ As a v0, implement via colored rectangles
 ### V1
 [ ] Bugs
     [ ] Running away shouldn't remove the combat from the map
-    [ ] Constriction doesn't tick down and doesn't log anything
+    [ ] Constriction uses damage events rather than "attack" type genes
+    [ ] Remove the green adjacency highlighting
 [x] Basic versions of systems implemented for Battle and Components
 [x] Basic drafting system implemented
 [x] Game Over Screen
-[ ] Make status effects data driven
+[x] Make status effects data driven
 [ ] Models loaded and displaying on screen
 [ ] 10 basic genes and 3 basic enemies
     [ ] Status effects need to wear out at the appropriate time (e.g. block at the beginning of turn)

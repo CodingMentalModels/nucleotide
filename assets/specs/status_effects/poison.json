@@ -1,0 +1,8 @@
+{
+    "name": "Poison",
+    "handle": "Poison",
+    "description": "Take one damage per stack at end of turn.",
+    "activation_timing": "EndOfTurn", 
+    "applicability": "EveryTurn",
+    "clear_criteria": [] 
+}

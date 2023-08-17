@@ -1,0 +1,8 @@
+{
+    "name": "Running Away",
+    "handle": "RunningAway",
+    "description": "Runs away once stacks reach 0.",
+    "activation_timing": "EndOfTurn", 
+    "applicability": "EveryTurn",
+    "clear_criteria": []
+}

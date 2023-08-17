@@ -400,8 +400,9 @@ fn render_character(ui: &mut Ui, character_state: CharacterUIState, character_ty
     )));
     for (effect, amount) in &character_state.status_effects {
         ui.label(get_default_text(format!(
-            "Effect: {:?} x{:?}",
-            effect, amount
+            "Effect: {} x{}",
+            effect.get_name(),
+            amount
         )));
     }
 

@@ -1,6 +1,7 @@
 // Filepaths
 pub const ENEMY_SPEC_DIRECTORY: &str = "assets/specs/enemies/";
 pub const GENE_SPEC_DIRECTORY: &str = "assets/specs/genes/";
+pub const STATUS_EFFECT_SPEC_DIRECTORY: &str = "assets/specs/status_effects/";
 
 // Game Parameters
 pub const STARTING_PLAYER_ENERGY: u8 = 3;

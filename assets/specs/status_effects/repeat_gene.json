@@ -1,0 +1,8 @@
+{
+    "name": "Repeat Gene",
+    "handle": "RepeatGene",
+    "description": "Repeats the following gene.",
+    "activation_timing": "StartOfTurn", 
+    "applicability": "OwnTurn",
+    "clear_criteria": ["OnTurnHandover"]
+}

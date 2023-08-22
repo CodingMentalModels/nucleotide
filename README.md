@@ -245,7 +245,6 @@ As a v0, implement via colored rectangles
 
 ### V1
 [ ] Bugs
-    [ ] Remove the green adjacency highlighting
 [x] Basic versions of systems implemented for Battle and Components
 [x] Basic drafting system implemented
 [x] Game Over Screen

@@ -1,5 +1,6 @@
 {
     "name": "Reverse Codon",
+    "gene_type": "Utility",
     "text": "Reverse the order in which genes are processed.",
     "target": "Us",
     "gene_commands": [

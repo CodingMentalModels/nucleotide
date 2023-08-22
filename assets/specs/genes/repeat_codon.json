@@ -1,5 +1,6 @@
 {
     "name": "Repeat Codon",
+    "gene_type": "Utility",
     "text": "Activate the next gene an additional time.",
     "target": "Us",
     "gene_commands": [

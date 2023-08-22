@@ -275,7 +275,7 @@ fn fetch_battle_actions_system(
     if not_players_turn {
         battle_actions.0 = vec![BattleActionEvent::Continue];
     } else if is_running {
-        battle_actions.0 = vec![BattleActionEvent::ExpressGene];
+        battle_actions.0 = vec![BattleActionEvent::Continue];
     } else {
         battle_actions.0 = BattleActionEvent::all_player_actions();
     }

@@ -70,6 +70,12 @@ fn initialize_map_system(
     mut material_cache: ResMut<MaterialCache>,
     map_state: Res<MapState>,
 ) {
+    let player_node_index = map_state
+        .0
+        .get_player_room_index()
+        .expect("The player node should always be well defined.");
+    let mut player_front_rect = None;
+
     let node_indices = map_state.0.get_node_indices();
     let mut map_sprites = Vec::new();
     let mut to_add_adjacencies = Vec::new();
@@ -94,6 +100,10 @@ fn initialize_map_system(
 
         map_sprites.push(front_rect);
         map_sprites.push(back_rect);
+
+        if node_index == player_node_index {
+            player_front_rect = Some(front_rect);
+        }
 
         to_add_adjacencies.push((node_index, back_rect));
 
@@ -150,6 +160,22 @@ fn initialize_map_system(
         map_sprites.push(door_sprite);
     }
 
+    let player_rect = Rect::from_center_size(Vec2::ZERO, Vec2::ONE * PLAYER_RECT_ON_MAP_SIZE);
+    let player_sprite = get_rect_sprite(
+        &mut commands,
+        &mut meshes,
+        &mut materials,
+        &mut material_cache,
+        player_rect,
+        1.5,
+        Vec2::ZERO,
+        Color::BLACK,
+    );
+    commands.entity(player_sprite).insert(PlayerSpriteOnMap);
+    commands
+        .entity(player_front_rect.expect("The player must be somewhere."))
+        .add_child(player_sprite);
+
     commands.insert_resource(MapSprites(map_sprites));
 }
 
@@ -170,11 +196,6 @@ fn update_map_system(
         Without<PlayerSpriteOnMap>,
     >,
 ) {
-    let old_player_sprites: Vec<_> = player_sprite_query.iter().map(|entity| entity).collect();
-    old_player_sprites
-        .into_iter()
-        .for_each(|e| commands.entity(e).despawn());
-
     let player_node_index = map_state
         .0
         .get_player_room_index()
@@ -186,14 +207,21 @@ fn update_map_system(
         .map(|(entity, _, _, adjacent_rooms)| (entity, adjacent_rooms.0.clone()))
         .expect("One of the hoverables is always the player room.");
 
-    for entity in adjacent_rooms.iter() {
-        commands.entity(*entity).insert(get_or_insert_material(
-            Color::GREEN,
-            &mut *materials,
-            &mut *material_cache,
-        ));
+    for (entity, _, _, _) in hoverables_query.iter() {
+        if adjacent_rooms.contains(&entity) {
+            commands.entity(entity).insert(get_or_insert_material(
+                Color::GREEN,
+                &mut *materials,
+                &mut *material_cache,
+            ));
+        } else {
+            commands.entity(entity).insert(get_or_insert_material(
+                Color::WHITE,
+                &mut *materials,
+                &mut *material_cache,
+            ));
+        }
     }
-
     let maybe_hovered_room = hoverables_query
         .into_iter()
         .filter(|(entity, raycast, _, _)| {
@@ -205,22 +233,9 @@ fn update_map_system(
         None => player_room_entity,
     };
 
-    let player_rect = Rect::from_center_size(Vec2::ZERO, Vec2::ONE * PLAYER_RECT_ON_MAP_SIZE);
-    let player_sprite = get_rect_sprite(
-        &mut commands,
-        &mut meshes,
-        &mut materials,
-        &mut material_cache,
-        player_rect,
-        1.5,
-        Vec2::ZERO,
-        Color::BLACK,
-    );
-    commands.entity(player_sprite).insert(PlayerSpriteOnMap);
-
     commands
         .entity(hovered_player_room)
-        .add_child(player_sprite);
+        .add_child(player_sprite_query.single());
 }
 
 fn select_room_system(

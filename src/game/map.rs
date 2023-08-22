@@ -207,14 +207,21 @@ fn update_map_system(
         .map(|(entity, _, _, adjacent_rooms)| (entity, adjacent_rooms.0.clone()))
         .expect("One of the hoverables is always the player room.");
 
-    for entity in adjacent_rooms.iter() {
-        commands.entity(*entity).insert(get_or_insert_material(
-            Color::GREEN,
-            &mut *materials,
-            &mut *material_cache,
-        ));
+    for (entity, _, _, _) in hoverables_query.iter() {
+        if adjacent_rooms.contains(&entity) {
+            commands.entity(entity).insert(get_or_insert_material(
+                Color::GREEN,
+                &mut *materials,
+                &mut *material_cache,
+            ));
+        } else {
+            commands.entity(entity).insert(get_or_insert_material(
+                Color::WHITE,
+                &mut *materials,
+                &mut *material_cache,
+            ));
+        }
     }
-
     let maybe_hovered_room = hoverables_query
         .into_iter()
         .filter(|(entity, raycast, _, _)| {

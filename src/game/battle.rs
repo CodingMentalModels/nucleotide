@@ -4,9 +4,11 @@ use crate::game::constants::*;
 use crate::game::resources::*;
 
 use super::events::BattleActionEvent;
-use super::specs::ActivationTiming;
+use super::specs::ClearCriterion;
 use super::specs::EnemyName;
 use super::specs::StatusEffect;
+use super::specs::StatusEffectHandle;
+use super::specs::TurnTiming;
 use super::specs::{GeneCommand, TargetType};
 use super::ui_state::CharacterUIState;
 use super::ui_state::GeneUIState;
@@ -167,7 +169,7 @@ struct BlockEvent(TargetEntity, u8);
 struct GeneProcessingEvent(TargetEntity, GeneProcessingEventType);
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Event)]
-struct StatusEffectEvent(TargetEntity, StatusEffect, u8);
+struct StatusEffectEvent(TargetEntity, StatusEffectHandle, u8);
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Event)]
 enum GeneProcessingEventType {
@@ -243,7 +245,7 @@ fn character_acting_system(
             .filter(|(entity, _block, _statuses)| entity == &character_acting.0)
             .for_each(|(entity, mut block, mut statuses)| {
                 if entity == acting_entity {
-                    statuses.end_of_turn_clear();
+                    statuses.turn_handover_clear();
                 } else {
                     block.0 = 0; // TODO: Doesn't handle multiple enemies
                 }
@@ -265,12 +267,15 @@ fn fetch_battle_actions_system(
     mut battle_actions: ResMut<BattleActions>,
 ) {
     let not_players_turn = !character_type_to_entity_map.is_player(character_acting.0);
-    let is_running = status_query.single().0.contains(&StatusEffect::RunningAway);
+    let is_running = status_query
+        .single()
+        .0
+        .contains_handle(&StatusEffectHandle::RunningAway);
 
     if not_players_turn {
         battle_actions.0 = vec![BattleActionEvent::Continue];
     } else if is_running {
-        battle_actions.0 = vec![BattleActionEvent::ExpressGene];
+        battle_actions.0 = vec![BattleActionEvent::Continue];
     } else {
         battle_actions.0 = BattleActionEvent::all_player_actions();
     }
@@ -279,6 +284,7 @@ fn fetch_battle_actions_system(
 fn handle_battle_actions_system(
     mut player_query: Query<&mut StatusEffectComponent, With<PlayerComponent>>,
     mut battle_action_event_reader: EventReader<BattleActionEvent>,
+    status_effect_specs: Res<StatusEffectSpecs>,
     current_state: Res<State<NucleotideState>>,
     mut next_state: ResMut<NextState<NucleotideState>>,
     mut log: ResMut<LogState>,
@@ -288,12 +294,26 @@ fn handle_battle_actions_system(
             BattleActionEvent::Continue | BattleActionEvent::ExpressGene => {}
             BattleActionEvent::RunAway => {
                 let mut status_effects = player_query.single_mut();
-                status_effects.add(StatusEffect::RunningAway, ENERGY_COST_TO_RUN_AWAY);
+                status_effects.add(
+                    status_effect_specs
+                        .0
+                        .get(&StatusEffectHandle::RunningAway)
+                        .expect("Running away should exist!")
+                        .clone(),
+                    ENERGY_COST_TO_RUN_AWAY,
+                );
                 log.log_string("Running away!".to_string());
             }
             BattleActionEvent::Skip => {
                 let mut status_effects = player_query.single_mut();
-                status_effects.add(StatusEffect::Skipping, 1);
+                status_effects.add(
+                    status_effect_specs
+                        .0
+                        .get(&StatusEffectHandle::Skipping)
+                        .expect("Skipping should exist!")
+                        .clone(),
+                    1,
+                );
             }
         }
         queue_next_state_if_not_already_queued(
@@ -318,7 +338,7 @@ fn handle_start_of_turn_statuses_system(
         query,
         ran_away_event_writer,
         damage_event_writer,
-        ActivationTiming::StartOfTurn,
+        TurnTiming::StartOfTurn,
         &mut log_state,
     );
 
@@ -341,9 +361,9 @@ fn gene_loading_system(
 ) {
     let (acting_entity, genome, status_effects) = query.get_mut(character_acting.0).unwrap();
 
-    if status_effects.contains(&StatusEffect::RunningAway) {
+    if status_effects.contains_handle(&StatusEffectHandle::RunningAway) {
         log.log_string("Trying to run away.".to_string());
-    } else if status_effects.contains(&StatusEffect::Skipping) {
+    } else if status_effects.contains_handle(&StatusEffectHandle::Skipping) {
         log.log_string("Skipping gene.".to_string())
     } else {
         let gene = genome.get_active_gene();
@@ -359,18 +379,43 @@ fn gene_loading_system(
             gene_spec.get_target(),
         );
 
+        let to_log_and_commands: Vec<(_, _)> = gene_spec
+            .get_gene_commands()
+            .into_iter()
+            .map(|gene_command| match gene_command {
+                GeneCommand::Damage(damage) => {
+                    if status_effects.contains_handle(&StatusEffectHandle::Constricted) {
+                        (
+                            Some(format!("Constricted! ({} damage prevented)", damage)),
+                            None,
+                        )
+                    } else {
+                        (None, Some(gene_command))
+                    }
+                }
+                _ => (None, Some(gene_command)),
+            })
+            .collect();
+
+        to_log_and_commands
+            .iter()
+            .for_each(|(maybe_to_log, _)| match maybe_to_log {
+                None => {}
+                Some(l) => log.log_string(l.to_string()),
+            });
+
         gene_command_queue.0.append(
-            &mut gene_spec
-                .get_gene_commands()
+            &mut to_log_and_commands
                 .iter()
-                .filter(|gene_command| match gene_command {
-                    GeneCommand::Damage(_) => !status_effects.contains(&StatusEffect::Constricted),
-                    _ => true,
-                })
+                .map(|(_, gene_command)| gene_command)
+                .filter(|gene_command| gene_command.is_some())
                 .map(|gene_command| {
-                    targets
-                        .iter()
-                        .map(|target| (gene_command.clone(), target.clone()))
+                    targets.iter().map(|target| {
+                        (
+                            gene_command.expect("We just filtered out Nones").clone(),
+                            target.clone(),
+                        )
+                    })
                 })
                 .flatten()
                 .collect(),
@@ -418,7 +463,7 @@ fn handle_gene_commands_system(
             ),
             GeneCommand::Status(effect, n_stacks) => log_and_send(
                 &mut log_state,
-                format!("{} stacks of {} applied.", n_stacks, effect.to_string()),
+                format!("{} stacks of {:?} applied.", n_stacks, effect),
                 &mut status_effect_event_writer,
                 StatusEffectEvent(*target_entity, *effect, *n_stacks),
             ),
@@ -521,11 +566,19 @@ fn update_gene_processing_system(
 fn apply_status_effect_system(
     mut query: Query<(Entity, &mut StatusEffectComponent)>,
     mut status_effect_event_reader: EventReader<StatusEffectEvent>,
+    status_effect_specs: Res<StatusEffectSpecs>,
 ) {
     for status_effect_event in status_effect_event_reader.iter() {
         if let Ok((entity, mut status_effect)) = query.get_mut(status_effect_event.0) {
             if entity == status_effect_event.0 {
-                status_effect.add(status_effect_event.1, status_effect_event.2);
+                status_effect.add(
+                    status_effect_specs
+                        .0
+                        .get(&status_effect_event.1)
+                        .expect(&format!("{:?} should exist", status_effect_event.1))
+                        .clone(),
+                    status_effect_event.2,
+                );
             }
         }
     }
@@ -543,7 +596,7 @@ fn handle_end_of_turn_statuses_system(
         query,
         ran_away_event_writer,
         damage_event_writer,
-        ActivationTiming::EndOfTurn,
+        TurnTiming::EndOfTurn,
         &mut log,
     );
 }
@@ -556,7 +609,7 @@ fn finished_handling_gene_system(
 ) {
     let (mut genome, status_effects) = query.get_mut(character_acting.0).unwrap();
 
-    if !status_effects.contains(&StatusEffect::RunningAway) {
+    if !status_effects.contains_handle(&StatusEffectHandle::RunningAway) {
         genome.advance_pointer();
     }
 
@@ -770,12 +823,16 @@ pub struct BlockComponent(pub u8);
 pub struct StatusEffectComponent(pub Vec<(StatusEffect, u8)>);
 
 impl StatusEffectComponent {
-    pub fn contains(&self, status_effect: &StatusEffect) -> bool {
-        self.0.iter().filter(|(e, _)| e == status_effect).count() > 0
+    pub fn contains_handle(&self, handle: &StatusEffectHandle) -> bool {
+        self.0
+            .iter()
+            .filter(|(e, _)| e.get_handle() == *handle)
+            .count()
+            > 0
     }
 
     pub fn add(&mut self, status_effect: StatusEffect, n_stacks: u8) {
-        if self.contains(&status_effect) {
+        if self.contains_handle(&status_effect.get_handle()) {
             self.0 = self
                 .0
                 .clone()
@@ -797,12 +854,15 @@ impl StatusEffectComponent {
         self.0 = Vec::new();
     }
 
-    pub fn end_of_turn_clear(&mut self) {
+    pub fn turn_handover_clear(&mut self) {
         self.0 = self
             .0
             .clone()
             .into_iter()
-            .filter(|(s, _)| s.clears_after_turn())
+            .filter(|(s, _)| {
+                s.get_clear_criteria()
+                    .contains(&ClearCriterion::OnTurnHandover)
+            })
             .collect()
     }
 }
@@ -888,30 +948,32 @@ fn handle_statuses(
     mut query: Query<(Entity, &mut StatusEffectComponent, &mut GenomeComponent)>,
     mut ran_away_event_writer: EventWriter<RanAwayEvent>,
     mut damage_event_writer: EventWriter<DamageEvent>,
-    activation_timing: ActivationTiming,
+    activation_timing: TurnTiming,
     mut log: &mut ResMut<LogState>,
 ) {
     for (entity, mut status_effect, mut genome) in query.iter_mut() {
         status_effect
             .0
             .retain_mut(|(status_effect_type, n_stacks)| {
-                if status_effect_type.applies_only_on_turn() && (character_acting.0 != entity) {
+                if !status_effect_type
+                    .is_applicable_given_actor_and_entity(character_acting.0, entity)
+                {
                     return true;
                 }
-                if status_effect_type.get_activation_timing() != activation_timing {
+                if status_effect_type.get_activation_timing() != Some(activation_timing) {
                     return true;
                 }
-                match status_effect_type {
-                    StatusEffect::Skipping => {
+                match status_effect_type.get_handle() {
+                    StatusEffectHandle::Skipping => {
                         *n_stacks -= 1;
                     }
-                    StatusEffect::RunningAway => {
+                    StatusEffectHandle::RunningAway => {
                         *n_stacks -= 1;
                         if n_stacks == &mut 0 {
                             ran_away_event_writer.send(RanAwayEvent(entity))
                         }
                     }
-                    StatusEffect::Poison => {
+                    StatusEffectHandle::Poison => {
                         log_and_send(
                             &mut log,
                             format!("Poison deals {} damage.", n_stacks),
@@ -920,11 +982,11 @@ fn handle_statuses(
                         );
                         *n_stacks -= 1;
                     }
-                    StatusEffect::RepeatGene => {
+                    StatusEffectHandle::RepeatGene => {
                         genome.increment_repeat_gene();
                         *n_stacks -= 1;
                     }
-                    StatusEffect::Weak | StatusEffect::Constricted => {
+                    StatusEffectHandle::Weak | StatusEffectHandle::Constricted => {
                         *n_stacks -= 1;
                     }
                     _ => panic!("Unimplemented Status Effect! {:?}", status_effect_type),

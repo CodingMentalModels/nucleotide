@@ -1,0 +1,8 @@
+{
+    "name": "Skipping",
+    "handle": "Skipping",
+    "description": "Skipping one gene per stack.",
+    "activation_timing": "EndOfTurn", 
+    "applicability": "OwnTurn",
+    "clear_criteria": ["OnTurnHandover"]
+}

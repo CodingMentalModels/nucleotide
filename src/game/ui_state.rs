@@ -47,7 +47,7 @@ impl InBattleUIState {
             CharacterType::Player => self
                 .player_character_state
                 .update_genome(genome, gene_spec_lookup),
-            CharacterType::Enemy(name) => self
+            CharacterType::Enemy(_name) => self
                 .enemy_character_state
                 .update_genome(genome, gene_spec_lookup),
         }

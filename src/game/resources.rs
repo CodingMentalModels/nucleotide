@@ -7,7 +7,7 @@ use crate::game::specs::GeneCommand;
 
 use super::{
     events::BattleActionEvent,
-    specs::{EnemyName, EnemySpec, GeneName, GeneSpec},
+    specs::{EnemyName, EnemySpec, GeneName, GeneSpec, StatusEffect, StatusEffectHandle},
 };
 
 pub type Symbol = char;
@@ -129,6 +129,9 @@ impl EnemySpecs {
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash, Resource)]
 pub struct GeneSpecs(pub GeneSpecLookup);
+
+#[derive(Debug, Clone, PartialEq, Eq, Hash, Resource)]
+pub struct StatusEffectSpecs(pub StatusEffectSpecLookup);
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash, Resource)]
 pub struct CharacterTypeToEntity(pub Vec<(CharacterType, Entity)>);
@@ -281,6 +284,25 @@ impl GeneSpecLookup {
     pub fn get_text_from_symbol(&self, symbol: Symbol) -> Option<String> {
         self.get_spec_from_symbol(symbol)
             .map(|spec| spec.get_text())
+    }
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+pub struct StatusEffectSpecLookup {
+    handle_to_spec: BTreeMap<StatusEffectHandle, StatusEffect>,
+}
+
+impl StatusEffectSpecLookup {
+    pub fn from_specs(specs: Vec<StatusEffect>) -> Self {
+        let handle_to_spec = specs
+            .iter()
+            .map(|spec| (spec.get_handle().clone(), spec.clone()))
+            .collect();
+        Self { handle_to_spec }
+    }
+
+    pub fn get(&self, handle: &StatusEffectHandle) -> Option<&StatusEffect> {
+        self.handle_to_spec.get(handle)
     }
 }
 

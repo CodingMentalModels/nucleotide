@@ -1,3 +1,6 @@
+use std::collections::HashSet;
+
+use bevy::prelude::Entity;
 use serde::{Deserialize, Serialize};
 
 pub type GeneName = String;
@@ -91,14 +94,54 @@ pub enum GeneCommand {
     Damage(u8),
     Block(u8),
     Heal(u8),
-    Status(StatusEffect, u8),
+    Status(StatusEffectHandle, u8),
     JumpForwardNGenes(u8),
     ReverseGeneProcessing,
     GainEnergy(u8),
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
-pub enum StatusEffect {
+#[derive(Debug, Clone, PartialEq, Eq, Hash, Serialize, Deserialize)]
+pub struct StatusEffect {
+    name: String,
+    handle: StatusEffectHandle,
+    description: String,
+    activation_timing: Option<TurnTiming>,
+    applicability: Applicability,
+    clear_criteria: Vec<ClearCriterion>,
+}
+
+impl StatusEffect {
+    pub fn get_activation_timing(&self) -> Option<TurnTiming> {
+        self.activation_timing
+    }
+
+    pub fn get_handle(&self) -> StatusEffectHandle {
+        self.handle
+    }
+
+    pub fn get_applicability(&self) -> Applicability {
+        self.applicability
+    }
+
+    pub fn get_name(&self) -> String {
+        self.name.clone()
+    }
+
+    pub fn get_clear_criteria(&self) -> HashSet<ClearCriterion> {
+        self.clear_criteria.clone().into_iter().collect()
+    }
+
+    pub fn is_applicable_given_actor_and_entity(&self, actor: Entity, entity: Entity) -> bool {
+        match self.get_applicability() {
+            Applicability::EveryTurn => true,
+            Applicability::OwnTurn => actor == entity,
+            Applicability::OtherTurn => actor != entity,
+        }
+    }
+}
+
+#[derive(Debug, Clone, Copy, PartialOrd, PartialEq, Ord, Eq, Hash, Serialize, Deserialize)]
+pub enum StatusEffectHandle {
     Skipping,
     RunningAway,
     Poison,
@@ -107,56 +150,20 @@ pub enum StatusEffect {
     RepeatGene,
 }
 
-impl StatusEffect {
-    pub fn get_activation_timing(&self) -> ActivationTiming {
-        match self {
-            StatusEffect::Skipping => ActivationTiming::EndOfTurn,
-            StatusEffect::RunningAway => ActivationTiming::EndOfTurn,
-            StatusEffect::Poison => ActivationTiming::EndOfTurn,
-            StatusEffect::Weak => ActivationTiming::EndOfTurn,
-            StatusEffect::Constricted => ActivationTiming::NotApplicable,
-            StatusEffect::RepeatGene => ActivationTiming::StartOfTurn,
-        }
-    }
-
-    pub fn applies_only_on_turn(&self) -> bool {
-        match self {
-            StatusEffect::Skipping => true,
-            StatusEffect::RunningAway => true,
-            StatusEffect::Poison => false,
-            StatusEffect::Weak => true,
-            StatusEffect::Constricted => true,
-            StatusEffect::RepeatGene => true,
-        }
-    }
-
-    pub fn to_string(&self) -> String {
-        match self {
-            StatusEffect::Skipping => "Skipping",
-            StatusEffect::RunningAway => "Running Away",
-            StatusEffect::Poison => "Poison",
-            StatusEffect::Weak => "Weak",
-            StatusEffect::Constricted => "Constricted",
-            StatusEffect::RepeatGene => "Repeat Gene",
-        }
-        .to_string()
-    }
-
-    pub fn clears_after_turn(&self) -> bool {
-        match self {
-            StatusEffect::Skipping => true,
-            StatusEffect::RunningAway => false,
-            StatusEffect::Poison => false,
-            StatusEffect::Weak => false,
-            StatusEffect::Constricted => false,
-            StatusEffect::RepeatGene => true,
-        }
-    }
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
+pub enum TurnTiming {
+    StartOfTurn,
+    EndOfTurn,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
-pub enum ActivationTiming {
-    StartOfTurn,
-    EndOfTurn,
-    NotApplicable,
+pub enum ClearCriterion {
+    OnTurnHandover,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
+pub enum Applicability {
+    EveryTurn,
+    OwnTurn,
+    OtherTurn,
 }

@@ -1,12 +1,12 @@
 {
     "name": "Constrict",
-    "text": "Target can't attack for one turn.",
+    "text": "Target can't attack for three turns.",
     "target": "RandomEnemy",
     "gene_commands": [
         {
             "Status": [
                 "Constricted",
-                1
+                3
             ]
         }
     ]

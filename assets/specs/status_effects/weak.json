@@ -1,0 +1,8 @@
+{
+    "name": "Weak",
+    "handle": "Weak",
+    "description": "Deal 25% less damage.",
+    "activation_timing": null, 
+    "applicability": "OwnTurn",
+    "clear_criteria": []
+}

@@ -8,6 +8,7 @@ use crate::game::resources::*;
 use super::specs::EnemySpec;
 use super::specs::GeneCommand;
 use super::specs::GeneSpec;
+use super::specs::StatusEffect;
 use super::specs::TargetType;
 
 pub struct AssetsPlugin;
@@ -70,6 +71,13 @@ fn load_assets_system(mut commands: Commands) {
         .collect::<Result<Vec<GeneSpec>, _>>()
         .expect("Error parsing gene specs");
 
+    let status_effects = read_files_from_directory(Path::new(STATUS_EFFECT_SPEC_DIRECTORY))
+        .into_iter()
+        .filter(|s| s.len() > 0)
+        .map(|s| serde_json::from_str(&s))
+        .collect::<Result<Vec<StatusEffect>, _>>()
+        .expect("Error parsing status effects.");
+
     let enemy_specs = enemies
         .into_iter()
         .map(|s| (s.get_name().clone(), s))
@@ -81,9 +89,16 @@ fn load_assets_system(mut commands: Commands) {
             .filter(|s| !s.get_name().to_lowercase().contains("example"))
             .collect(),
     );
+    let status_effect_lookup = StatusEffectSpecLookup::from_specs(
+        status_effects
+            .into_iter()
+            .filter(|s| !s.get_name().to_lowercase().contains("example"))
+            .collect(),
+    );
 
     commands.insert_resource(EnemySpecs(enemy_specs));
     commands.insert_resource(GeneSpecs(gene_spec_lookup));
+    commands.insert_resource(StatusEffectSpecs(status_effect_lookup));
 
     commands.insert_resource(NextState(Some(NucleotideState::LoadingUI)));
 }

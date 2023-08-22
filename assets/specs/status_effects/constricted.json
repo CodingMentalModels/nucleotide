@@ -1,0 +1,8 @@
+{
+    "name": "Constricted",
+    "handle": "Constricted",
+    "description": "Prevent target from attacking.",
+    "activation_timing": "EndOfTurn", 
+    "applicability": "OwnTurn",
+    "clear_criteria": []
+}

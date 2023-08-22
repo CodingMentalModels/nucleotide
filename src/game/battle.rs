@@ -5,6 +5,7 @@ use crate::game::resources::*;
 
 use super::events::BattleActionEvent;
 use super::events::ClearCombatFromMapEvent;
+use super::map::MapState;
 use super::specs::ClearCriterion;
 use super::specs::EnemyName;
 use super::specs::StatusEffect;
@@ -76,6 +77,13 @@ impl Plugin for BattlePlugin {
                 Update,
                 update_gene_processing_system.run_if(get_event_handling_system_condition()),
             )
+            // Should be all of the get_event_handling_system_condition() states
+            .add_systems(
+                OnExit(NucleotideState::GeneCommandHandling),
+                remove_combat_from_map,
+            )
+            .add_systems(OnExit(NucleotideState::StartOfTurn), remove_combat_from_map)
+            .add_systems(OnExit(NucleotideState::EndOfTurn), remove_combat_from_map)
             .add_systems(
                 Update,
                 apply_status_effect_system.run_if(in_state(NucleotideState::GeneCommandHandling)),
@@ -563,6 +571,15 @@ fn update_gene_processing_system(
                 }
             }
         }
+    }
+}
+
+fn remove_combat_from_map(
+    mut clear_combat_reader: EventReader<ClearCombatFromMapEvent>,
+    mut map_state: ResMut<MapState>,
+) {
+    for _ in clear_combat_reader.iter() {
+        map_state.0.clear_player_room();
     }
 }
 

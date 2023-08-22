@@ -48,11 +48,7 @@ impl Plugin for MapPlugin {
                             .and_then(input_just_pressed(MouseButton::Left)),
                     ),
             )
-            .add_systems(OnExit(NucleotideState::SelectingRoom), despawn_map_system)
-            .add_systems(
-                OnEnter(NucleotideState::SelectingRoom),
-                remove_combat_from_map,
-            );
+            .add_systems(OnExit(NucleotideState::SelectingRoom), despawn_map_system);
     }
 }
 
@@ -312,14 +308,6 @@ fn despawn_map_system(mut commands: Commands, map_sprites: Res<MapSprites>) {
     }
 }
 
-fn remove_combat_from_map(
-    mut clear_combat_reader: EventReader<ClearCombatFromMapEvent>,
-    mut map_state: ResMut<MapState>,
-) {
-    for _ in clear_combat_reader.iter() {
-        map_state.0.clear_player_room();
-    }
-}
 // End Systems
 
 // Resources

@@ -18,6 +18,8 @@ use crate::game::constants::*;
 use crate::game::input::MouseoverRaycastSet;
 use crate::game::resources::*;
 
+use super::events::ClearCombatFromMapEvent;
+
 type DoorPosition = Vec2;
 type InternalGraph = UnGraph<Room, DoorPosition>;
 
@@ -25,7 +27,8 @@ pub struct MapPlugin;
 
 impl Plugin for MapPlugin {
     fn build(&self, app: &mut App) {
-        app.add_systems(OnEnter(NucleotideState::GeneratingMap), generate_map_system)
+        app.add_event::<ClearCombatFromMapEvent>()
+            .add_systems(OnEnter(NucleotideState::GeneratingMap), generate_map_system)
             .add_systems(
                 OnEnter(NucleotideState::SelectingRoom),
                 initialize_map_system,
@@ -47,13 +50,7 @@ impl Plugin for MapPlugin {
             )
             .add_systems(OnExit(NucleotideState::SelectingRoom), despawn_map_system)
             .add_systems(
-                OnExit(NucleotideState::SelectGeneFromEnemy),
-                remove_combat_from_map,
-            )
-            .add_systems(OnExit(NucleotideState::MoveGene), remove_combat_from_map)
-            .add_systems(OnExit(NucleotideState::SwapGenes), remove_combat_from_map)
-            .add_systems(
-                OnExit(NucleotideState::ResearchGene),
+                OnEnter(NucleotideState::SelectingRoom),
                 remove_combat_from_map,
             );
     }
@@ -315,8 +312,13 @@ fn despawn_map_system(mut commands: Commands, map_sprites: Res<MapSprites>) {
     }
 }
 
-fn remove_combat_from_map(mut map_state: ResMut<MapState>) {
-    map_state.0.clear_player_room();
+fn remove_combat_from_map(
+    mut clear_combat_reader: EventReader<ClearCombatFromMapEvent>,
+    mut map_state: ResMut<MapState>,
+) {
+    for _ in clear_combat_reader.iter() {
+        map_state.0.clear_player_room();
+    }
 }
 // End Systems
 

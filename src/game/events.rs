@@ -1,6 +1,9 @@
 use bevy::prelude::*;
 
 #[derive(Debug, Clone, Copy, Hash, PartialEq, Eq, Event)]
+pub struct ClearCombatFromMapEvent();
+
+#[derive(Debug, Clone, Copy, Hash, PartialEq, Eq, Event)]
 pub enum BattleActionEvent {
     Continue,
     ExpressGene,

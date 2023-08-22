@@ -4,6 +4,7 @@ use crate::game::constants::*;
 use crate::game::resources::*;
 
 use super::events::BattleActionEvent;
+use super::events::ClearCombatFromMapEvent;
 use super::specs::ClearCriterion;
 use super::specs::EnemyName;
 use super::specs::StatusEffect;
@@ -501,6 +502,7 @@ fn handle_ran_away_system(
 
 fn handle_damage_system(
     mut query: Query<(Entity, &mut HealthComponent, &mut BlockComponent)>,
+    mut clear_combat_writer: EventWriter<ClearCombatFromMapEvent>,
     mut damage_event_reader: EventReader<DamageEvent>,
     character_type_to_entity: Res<CharacterTypeToEntity>,
     current_state: Res<State<NucleotideState>>,
@@ -521,6 +523,7 @@ fn handle_damage_system(
                         NucleotideState::GameOver,
                     ),
                     CharacterType::Enemy(_) => {
+                        clear_combat_writer.send(ClearCombatFromMapEvent());
                         *battle_reward_ui_state =
                             SelectBattleRewardUIState::after_defeating_enemy();
                         force_next_state(

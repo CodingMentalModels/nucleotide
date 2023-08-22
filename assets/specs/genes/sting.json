@@ -1,5 +1,6 @@
 {
     "name": "Sting",
+    "gene_type": "Attack",
     "text": "Deal 6 damage and apply 3 poison.",
     "target": "RandomEnemy",
     "gene_commands": [

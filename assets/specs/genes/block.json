@@ -1,5 +1,6 @@
 {
     "name": "Block",
+    "gene_type": "Skill",
     "text": "Block 5 damage.",
     "target": "Us",
     "gene_commands": [

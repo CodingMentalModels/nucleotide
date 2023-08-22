@@ -8,6 +8,7 @@ use crate::game::resources::*;
 use super::specs::EnemySpec;
 use super::specs::GeneCommand;
 use super::specs::GeneSpec;
+use super::specs::GeneType;
 use super::specs::StatusEffect;
 use super::specs::TargetType;
 
@@ -35,6 +36,7 @@ fn generate_example_specs_system() {
 
     let gene_spec = GeneSpec::new(
         "Example Gene 1".to_string(),
+        GeneType::Skill,
         "This is an example gene.".to_string(),
         TargetType::RandomEnemy,
         vec![GeneCommand::Damage(10), GeneCommand::ReverseGeneProcessing],

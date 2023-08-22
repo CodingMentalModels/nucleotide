@@ -8,6 +8,7 @@ use super::events::ClearCombatFromMapEvent;
 use super::map::MapState;
 use super::specs::ClearCriterion;
 use super::specs::EnemyName;
+use super::specs::GeneType;
 use super::specs::StatusEffect;
 use super::specs::StatusEffectHandle;
 use super::specs::TurnTiming;
@@ -382,53 +383,54 @@ fn gene_loading_system(
             .0
             .get_spec_from_name(&gene)
             .expect("Gene should exist as a gene spec.");
-        let targets = get_targets(
-            acting_entity,
-            character_type_to_entity_map,
-            gene_spec.get_target(),
-        );
 
-        let to_log_and_commands: Vec<(_, _)> = gene_spec
-            .get_gene_commands()
-            .into_iter()
-            .map(|gene_command| match gene_command {
-                GeneCommand::Damage(damage) => {
-                    if status_effects.contains_handle(&StatusEffectHandle::Constricted) {
-                        (
-                            Some(format!("Constricted! ({} damage prevented)", damage)),
-                            None,
-                        )
-                    } else {
-                        (None, Some(gene_command))
-                    }
-                }
-                _ => (None, Some(gene_command)),
-            })
-            .collect();
+        if status_effects.contains_handle(&StatusEffectHandle::Constricted)
+            && gene_spec.get_gene_type() == GeneType::Attack
+        {
+            log.log_string(format!(
+                "Constricted!  Can't express {}.",
+                gene_spec.get_name()
+            ));
+        } else {
+            let targets = get_targets(
+                acting_entity,
+                character_type_to_entity_map,
+                gene_spec.get_target(),
+            );
 
-        to_log_and_commands
-            .iter()
-            .for_each(|(maybe_to_log, _)| match maybe_to_log {
-                None => {}
-                Some(l) => log.log_string(l.to_string()),
-            });
-
-        gene_command_queue.0.append(
-            &mut to_log_and_commands
-                .iter()
-                .map(|(_, gene_command)| gene_command)
-                .filter(|gene_command| gene_command.is_some())
-                .map(|gene_command| {
-                    targets.iter().map(|target| {
-                        (
-                            gene_command.expect("We just filtered out Nones").clone(),
-                            target.clone(),
-                        )
-                    })
+            let to_log_and_commands: Vec<(Option<String>, Option<GeneCommand>)> = gene_spec
+                .get_gene_commands()
+                .into_iter()
+                .map(|gene_command| match gene_command {
+                    // This can be used to pull out events and/or log them
+                    _ => (None, Some(gene_command)),
                 })
-                .flatten()
-                .collect(),
-        );
+                .collect();
+
+            to_log_and_commands
+                .iter()
+                .for_each(|(maybe_to_log, _)| match maybe_to_log {
+                    None => {}
+                    Some(l) => log.log_string(l.to_string()),
+                });
+
+            gene_command_queue.0.append(
+                &mut to_log_and_commands
+                    .iter()
+                    .map(|(_, gene_command)| gene_command)
+                    .filter(|gene_command| gene_command.is_some())
+                    .map(|gene_command| {
+                        targets.iter().map(|target| {
+                            (
+                                gene_command.expect("We just filtered out Nones").clone(),
+                                target.clone(),
+                            )
+                        })
+                    })
+                    .flatten()
+                    .collect(),
+            );
+        }
     }
 
     queue_next_state_if_not_already_queued(

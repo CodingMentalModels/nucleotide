@@ -1,1 +1,1 @@
-{"name":"Example Gene 1","text":"This is an example gene.","target":"RandomEnemy","gene_commands":[{"Damage":10},"ReverseGeneProcessing"]}
+{"name":"Example Gene 1","gene_type":"Skill","text":"This is an example gene.","target":"RandomEnemy","gene_commands":[{"Damage":10},"ReverseGeneProcessing"]}

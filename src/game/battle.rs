@@ -4,6 +4,8 @@ use crate::game::constants::*;
 use crate::game::resources::*;
 
 use super::events::BattleActionEvent;
+use super::events::ClearCombatFromMapEvent;
+use super::map::MapState;
 use super::specs::ClearCriterion;
 use super::specs::EnemyName;
 use super::specs::StatusEffect;
@@ -75,6 +77,13 @@ impl Plugin for BattlePlugin {
                 Update,
                 update_gene_processing_system.run_if(get_event_handling_system_condition()),
             )
+            // Should be all of the get_event_handling_system_condition() states
+            .add_systems(
+                OnExit(NucleotideState::GeneCommandHandling),
+                remove_combat_from_map,
+            )
+            .add_systems(OnExit(NucleotideState::StartOfTurn), remove_combat_from_map)
+            .add_systems(OnExit(NucleotideState::EndOfTurn), remove_combat_from_map)
             .add_systems(
                 Update,
                 apply_status_effect_system.run_if(in_state(NucleotideState::GeneCommandHandling)),
@@ -501,6 +510,7 @@ fn handle_ran_away_system(
 
 fn handle_damage_system(
     mut query: Query<(Entity, &mut HealthComponent, &mut BlockComponent)>,
+    mut clear_combat_writer: EventWriter<ClearCombatFromMapEvent>,
     mut damage_event_reader: EventReader<DamageEvent>,
     character_type_to_entity: Res<CharacterTypeToEntity>,
     current_state: Res<State<NucleotideState>>,
@@ -521,6 +531,7 @@ fn handle_damage_system(
                         NucleotideState::GameOver,
                     ),
                     CharacterType::Enemy(_) => {
+                        clear_combat_writer.send(ClearCombatFromMapEvent());
                         *battle_reward_ui_state =
                             SelectBattleRewardUIState::after_defeating_enemy();
                         force_next_state(
@@ -560,6 +571,15 @@ fn update_gene_processing_system(
                 }
             }
         }
+    }
+}
+
+fn remove_combat_from_map(
+    mut clear_combat_reader: EventReader<ClearCombatFromMapEvent>,
+    mut map_state: ResMut<MapState>,
+) {
+    for _ in clear_combat_reader.iter() {
+        map_state.0.clear_player_room();
     }
 }
 

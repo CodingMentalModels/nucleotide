@@ -1,6 +1,7 @@
 use std::collections::{BTreeMap, HashMap};
 
 use bevy::prelude::*;
+use rand::rngs::ThreadRng;
 
 use crate::game::constants::*;
 use crate::game::specs::GeneCommand;
@@ -212,6 +213,7 @@ impl CharacterType {
 pub enum CharacterStatType {
     Health,
     Block,
+    Dodge,
     Energy,
     Statuses,
 }
@@ -221,6 +223,7 @@ impl CharacterStatType {
         match self {
             Self::Health => "Health",
             Self::Block => "Block",
+            Self::Dodge => "Dodge",
             Self::Energy => "Energy",
             Self::Statuses => "Statuses",
         }

@@ -107,6 +107,7 @@ pub enum TargetType {
 pub enum GeneCommand {
     Damage(u8),
     Block(u8),
+    Dodge(u8),
     Heal(u8),
     Status(StatusEffectHandle, u8),
     JumpForwardNGenes(u8),

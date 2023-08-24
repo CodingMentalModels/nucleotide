@@ -398,6 +398,10 @@ fn render_character(ui: &mut Ui, character_state: CharacterUIState, character_ty
         "Block: {}",
         character_state.block
     )));
+    ui.label(get_default_text(format!(
+        "Dodge: {}",
+        character_state.dodge
+    )));
     for (effect, amount) in &character_state.status_effects {
         ui.label(get_default_text(format!(
             "Effect: {} x{}",

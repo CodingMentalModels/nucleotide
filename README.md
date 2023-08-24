@@ -251,8 +251,8 @@ As a v0, implement via colored rectangles
 [x] Make status effects data driven
 [ ] Models loaded and displaying on screen
 [ ] 10 basic genes and 3 basic enemies
-    [ ] Status effects need to wear out at the appropriate time (e.g. block at the beginning of turn)
-    [ ] Status effects need to stack (right now you just get multiple status effects with stacks of whatever they were added with)
+    [x] Status effects need to wear out at the appropriate time (e.g. block at the beginning of turn)
+    [x] Status effects need to stack (right now you just get multiple status effects with stacks of whatever they were added with)
 
 ### V2
 [ ] Bosses

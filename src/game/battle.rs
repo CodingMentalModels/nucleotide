@@ -461,7 +461,7 @@ fn handle_gene_commands_system(
             GeneCommand::Block(amount) => {
                 log_and_send(
                     &mut log_state,
-                    format!("{} damage blocked.", amount),
+                    format!("Blocking for {} damage.", amount),
                     &mut block_event_writer,
                     BlockEvent(*target_entity, *amount),
                 );
